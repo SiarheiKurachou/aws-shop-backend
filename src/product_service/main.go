@@ -1,0 +1,26 @@
+//go:build !lambda_list_products && !lambda_get_product_by_id
+
+package main
+
+import (
+	_ "aws-shop-backend/src/product_service/docs"
+	"log"
+	"net/http"
+
+	httpSwagger "github.com/swaggo/http-swagger"
+)
+
+// @title AWS Shop Backend API
+// @version 1.0
+// @description Product service API
+// @BasePath /
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/products", handleListProducts)
+	mux.HandleFunc("/products/", handleGetProductByID)
+	mux.Handle("/swagger/", httpSwagger.WrapHandler)
+
+	log.Println("Server starting on :8080")
+	log.Fatal(http.ListenAndServe(":8080", mux))
+}
