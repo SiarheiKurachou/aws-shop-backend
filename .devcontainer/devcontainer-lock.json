@@ -1,0 +1,14 @@
+{
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {
+      "version": "1.1.4",
+      "resolved": "ghcr.io/devcontainers/features/aws-cli@sha256:1f93c8315b7a6d76982ebb2269f8b0d50413fc0f965c032edf4aee0caceb73ef",
+      "integrity": "sha256:1f93c8315b7a6d76982ebb2269f8b0d50413fc0f965c032edf4aee0caceb73ef"
+    },
+    "ghcr.io/postfinance/devcontainer-features/node:1": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/postfinance/devcontainer-features/node@sha256:0fa130db8073c82386f021022fc5faf5908b844723e6c2a8afd0fa0461c19f86",
+      "integrity": "sha256:0fa130db8073c82386f021022fc5faf5908b844723e6c2a8afd0fa0461c19f86"
+    }
+  }
+}
