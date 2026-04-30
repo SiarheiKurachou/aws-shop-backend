@@ -3,7 +3,7 @@
 package main
 
 import (
-	_ "aws-shop-backend/src/product_service/docs"
+	_ "aws-shop-backend/src/product-service/docs"
 	"log"
 	"net/http"
 

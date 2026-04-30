@@ -5,10 +5,10 @@ Backend for RSSchool aws-shop app including deployments
 To start locally:
 ```
 # Load from .env file before running (bash/zsh)
-set -a && source .env && set +a && go run -buildvcs=false ./src/product_service
+set -a && source .env && set +a && go run -buildvcs=false ./src/product-service
 
 # Or directly in the command
-$(cat .env) go run -buildvcs=false ./src/product_service
+$(cat .env) go run -buildvcs=false ./src/product-service
 ```
 
 ## Deploy
@@ -20,7 +20,7 @@ Before running CDK commands, make sure these prerequisites are in place:
 - Node.js is available so `npx aws-cdk` can run.
 - The frontend has already been built and the static files exist in `dist-ui/`.
 - The Lambda artifacts can be built locally with `make build-lambdas`.
-- Swagger static files exist in `src/product_service/docs/`.
+- Swagger static files exist in `src/product-service/docs/`.
 
 Export the deployment environment variables:
 
@@ -48,13 +48,13 @@ Build Swagger docs before synth or deploy if API annotations changed:
 go install github.com/swaggo/swag/cmd/swag@latest
 
 # Regenerate docs.go, swagger.json, and swagger.yaml
-swag init -g src/product_service/main.go -o src/product_service/docs
+swag init -g src/product-service/main.go -o src/product-service/docs
 
 # If "swag" is not in PATH, run it directly:
-# $(go env GOPATH)/bin/swag init -g src/product_service/main.go -o src/product_service/docs
+# $(go env GOPATH)/bin/swag init -g src/product-service/main.go -o src/product-service/docs
 ```
 
-Swagger static files are deployed from `src/product_service/docs/` to the website bucket under `docs/`.
+Swagger static files are deployed from `src/product-service/docs/` to the website bucket under `docs/`.
 After deployment, use the CloudFront domain output to access:
 
 - `https://<cloudfront-domain>/docs/swagger.json`
@@ -87,6 +87,6 @@ What gets deployed:
 - An S3 bucket for the website assets
 - A CloudFront distribution in front of that S3 bucket
 - A bucket deployment that uploads `dist-ui/` contents and invalidates `/*`
-- A bucket deployment that uploads Swagger files from `src/product_service/docs/` to `docs/`
+- A bucket deployment that uploads Swagger files from `src/product-service/docs/` to `docs/`
 
 The stack outputs include the API URL, website bucket name, CloudFront domain name, and Lambda function names.

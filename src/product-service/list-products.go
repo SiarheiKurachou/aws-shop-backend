@@ -1,7 +1,7 @@
 package main
 
 import (
-	"aws-shop-backend/src/product_service/core"
+	"aws-shop-backend/src/product-service/core"
 	"net/http"
 )
 

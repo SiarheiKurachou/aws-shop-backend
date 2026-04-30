@@ -1,6 +1,6 @@
 package main
 
-import "aws-shop-backend/src/product_service/core"
+import "aws-shop-backend/src/product-service/core"
 
 // Type aliases retained for Swagger annotations and existing tests.
 type Product = core.Product

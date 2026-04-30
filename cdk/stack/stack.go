@@ -48,8 +48,8 @@ func uiAssetPath() *string {
 
 func swaggerAssetPath() *string {
 	candidates := []string{
-		filepath.Join("src", "product_service", "docs"),
-		filepath.Join("product_service", "docs"),
+		filepath.Join("src", "product-service", "docs"),
+		filepath.Join("product-service", "docs"),
 	}
 
 	for _, candidate := range candidates {
@@ -58,7 +58,7 @@ func swaggerAssetPath() *string {
 		}
 	}
 
-	panic("swagger asset directory not found; expected src/product_service/docs")
+	panic("swagger asset directory not found; expected src/product-service/docs")
 }
 
 // websiteBucketName returns the configured bucket name, or nil to let CDK
