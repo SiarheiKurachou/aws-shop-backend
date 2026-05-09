@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/google/uuid"
 )
 
 var (
@@ -320,4 +321,115 @@ func LoadProductByID(productID string) (Product, bool, error) {
 
 	product, found := FindProductByID(products, productID)
 	return product, found, nil
+}
+
+// ValidateCreateProductRequest validates a create product request.
+func ValidateCreateProductRequest(req CreateProductRequest) error {
+	if strings.TrimSpace(req.Title) == "" {
+		return fmt.Errorf("title is required")
+	}
+
+	if req.Price < 0 {
+		return fmt.Errorf("price must be non-negative")
+	}
+
+	if req.Count < 0 {
+		return fmt.Errorf("count must be non-negative")
+	}
+
+	return nil
+}
+
+// CreateProductInDynamo creates a new product and stock entry in DynamoDB using a transaction.
+func CreateProductInDynamo(ctx context.Context, productsTable string, stocksTable string, req CreateProductRequest) (Product, error) {
+	client, err := getDynamoClient(ctx)
+	if err != nil {
+		return Product{}, err
+	}
+
+	// Generate UUID if not provided
+	productID := req.ID
+	if productID == "" {
+		productID = uuid.New().String()
+	}
+
+	// Default stock count to 0 if not provided
+	count := req.Count
+	if count < 0 {
+		count = 0
+	}
+
+	// Prepare product item
+	productItem := dbProduct{
+		ID:          productID,
+		Title:       req.Title,
+		Description: req.Description,
+		Price:       req.Price,
+	}
+
+	productAV, err := attributevalue.MarshalMap(productItem)
+	if err != nil {
+		return Product{}, fmt.Errorf("marshal product: %w", err)
+	}
+
+	// Prepare stock item
+	stockItem := dbStock{
+		ProductID: productID,
+		Count:     count,
+	}
+
+	stockAV, err := attributevalue.MarshalMap(stockItem)
+	if err != nil {
+		return Product{}, fmt.Errorf("marshal stock: %w", err)
+	}
+
+	// Use transact write to insert both items atomically
+	_, err = client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []dynamodbTypes.TransactWriteItem{
+			{
+				Put: &dynamodbTypes.Put{
+					TableName: aws.String(productsTable),
+					Item:      productAV,
+				},
+			},
+			{
+				Put: &dynamodbTypes.Put{
+					TableName: aws.String(stocksTable),
+					Item:      stockAV,
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		return Product{}, fmt.Errorf("transact write items: %w", err)
+	}
+
+	return Product{
+		ID:          productID,
+		Title:       req.Title,
+		Description: req.Description,
+		Price:       req.Price,
+		Count:       count,
+	}, nil
+}
+
+// CreateProduct creates a new product with validation.
+// Uses DynamoDB if configured, otherwise returns an error (JSON doesn't support writes).
+func CreateProduct(req CreateProductRequest) (Product, error) {
+	// Validate request
+	if err := ValidateCreateProductRequest(req); err != nil {
+		return Product{}, err
+	}
+
+	productsTable, stocksTable, configured, err := tableNamesFromEnv()
+	if err != nil {
+		return Product{}, err
+	}
+
+	if !configured {
+		return Product{}, fmt.Errorf("write operations require DynamoDB to be configured via PRODUCTS_TABLE_NAME and STOCKS_TABLE_NAME environment variables")
+	}
+
+	return CreateProductInDynamo(context.Background(), productsTable, stocksTable, req)
 }

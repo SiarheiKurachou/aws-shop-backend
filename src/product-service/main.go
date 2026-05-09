@@ -3,6 +3,7 @@
 package main
 
 import (
+	"aws-shop-backend/src/product-service/core"
 	_ "aws-shop-backend/src/product-service/docs"
 	"log"
 	"net/http"
@@ -17,7 +18,18 @@ import (
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/products", handleListProducts)
+
+	// Handle /products with method-based routing
+	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			handleCreateProduct(w, r)
+		} else if r.Method == "GET" {
+			handleListProducts(w, r)
+		} else {
+			core.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		}
+	})
+
 	mux.HandleFunc("/products/", handleGetProductByID)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 

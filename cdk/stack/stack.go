@@ -197,12 +197,29 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	productsTable.GrantReadData(getProductByIDFn)
 	stocksTable.GrantReadData(getProductByIDFn)
 
+	createProductFn := awslambda.NewFunction(stack, _jsii_.String("create-product-lambda"), &awslambda.FunctionProps{
+		FunctionName: _jsii_.String("create-product"),
+		Runtime:      awslambda.Runtime_PROVIDED_AL2023(),
+		Handler:      _jsii_.String("bootstrap"),
+		Code:         awslambda.Code_FromAsset(lambdaAssetPath("create-product"), nil),
+		MemorySize:   _jsii_.Number(512),
+		Timeout:      awscdk.Duration_Seconds(_jsii_.Number(10)),
+		Environment: &map[string]*string{
+			"PRODUCTS_TABLE_NAME": productsTable.TableName(),
+			"STOCKS_TABLE_NAME":   stocksTable.TableName(),
+		},
+	})
+
+	productsTable.GrantWriteData(createProductFn)
+	stocksTable.GrantWriteData(createProductFn)
+
 	api := awsapigateway.NewRestApi(stack, _jsii_.String("product-service-api"), &awsapigateway.RestApiProps{
 		RestApiName: _jsii_.String("product-service"),
 		Description: _jsii_.String("REST API for product service handlers"),
 		DefaultCorsPreflightOptions: &awsapigateway.CorsOptions{
 			AllowMethods: &[]*string{
 				_jsii_.String("GET"),
+				_jsii_.String("POST"),
 				_jsii_.String("OPTIONS"),
 			},
 			AllowOrigins: awsapigateway.Cors_ALL_ORIGINS(),
@@ -216,6 +233,11 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	productsResource.AddMethod(
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(listProductsFn, nil),
+		nil,
+	)
+	productsResource.AddMethod(
+		_jsii_.String("POST"),
+		awsapigateway.NewLambdaIntegration(createProductFn, nil),
 		nil,
 	)
 
@@ -260,6 +282,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-product-by-id-lambda-name"), &awscdk.CfnOutputProps{
 		Value: getProductByIDFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("create-product-lambda-name"), &awscdk.CfnOutputProps{
+		Value: createProductFn.FunctionName(),
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("products-table-name"), &awscdk.CfnOutputProps{
