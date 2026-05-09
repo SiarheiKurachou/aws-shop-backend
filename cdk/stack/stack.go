@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfront"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfrontorigins"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3deployment"
@@ -102,9 +103,7 @@ func deploymentEnv() *awscdk.Environment {
 //
 // Expected Lambda artifacts:
 // - cdk/dist/get-products-list/bootstrap
-// - cdk/dist/get-products-list/data.json
 // - cdk/dist/get-product-by-id/bootstrap
-// - cdk/dist/get-product-by-id/data.json
 func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	stack := awscdk.NewStack(scope, _jsii_.String("epam-shop-website-stack"), &awscdk.StackProps{
 		StackName: _jsii_.String("epam-shop-website-stack"),
@@ -147,6 +146,26 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		DistributionPaths:    &[]*string{_jsii_.String("/docs/*")},
 	})
 
+	productsTable := awsdynamodb.NewTable(stack, _jsii_.String("products-table"), &awsdynamodb.TableProps{
+		TableName: _jsii_.String("products"),
+		PartitionKey: &awsdynamodb.Attribute{
+			Name: _jsii_.String("id"),
+			Type: awsdynamodb.AttributeType_STRING,
+		},
+		BillingMode:   awsdynamodb.BillingMode_PAY_PER_REQUEST,
+		RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
+	})
+
+	stocksTable := awsdynamodb.NewTable(stack, _jsii_.String("stocks-table"), &awsdynamodb.TableProps{
+		TableName: _jsii_.String("stocks"),
+		PartitionKey: &awsdynamodb.Attribute{
+			Name: _jsii_.String("product_id"),
+			Type: awsdynamodb.AttributeType_STRING,
+		},
+		BillingMode:   awsdynamodb.BillingMode_PAY_PER_REQUEST,
+		RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
+	})
+
 	listProductsFn := awslambda.NewFunction(stack, _jsii_.String("get-products-list-lambda"), &awslambda.FunctionProps{
 		FunctionName: _jsii_.String("get-products-list"),
 		Runtime:      awslambda.Runtime_PROVIDED_AL2023(),
@@ -155,7 +174,8 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		MemorySize:   _jsii_.Number(512),
 		Timeout:      awscdk.Duration_Seconds(_jsii_.Number(10)),
 		Environment: &map[string]*string{
-			"PRODUCTS_DATA_FILE": _jsii_.String("/var/task/data.json"),
+			"PRODUCTS_TABLE_NAME": productsTable.TableName(),
+			"STOCKS_TABLE_NAME":   stocksTable.TableName(),
 		},
 	})
 
@@ -167,9 +187,15 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		MemorySize:   _jsii_.Number(512),
 		Timeout:      awscdk.Duration_Seconds(_jsii_.Number(10)),
 		Environment: &map[string]*string{
-			"PRODUCTS_DATA_FILE": _jsii_.String("/var/task/data.json"),
+			"PRODUCTS_TABLE_NAME": productsTable.TableName(),
+			"STOCKS_TABLE_NAME":   stocksTable.TableName(),
 		},
 	})
+
+	productsTable.GrantReadData(listProductsFn)
+	stocksTable.GrantReadData(listProductsFn)
+	productsTable.GrantReadData(getProductByIDFn)
+	stocksTable.GrantReadData(getProductByIDFn)
 
 	api := awsapigateway.NewRestApi(stack, _jsii_.String("product-service-api"), &awsapigateway.RestApiProps{
 		RestApiName: _jsii_.String("product-service"),
@@ -234,6 +260,14 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-product-by-id-lambda-name"), &awscdk.CfnOutputProps{
 		Value: getProductByIDFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("products-table-name"), &awscdk.CfnOutputProps{
+		Value: productsTable.TableName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("stocks-table-name"), &awscdk.CfnOutputProps{
+		Value: stocksTable.TableName(),
 	})
 
 	return stack

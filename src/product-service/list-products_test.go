@@ -73,7 +73,7 @@ func TestLoadProducts(t *testing.T) {
 				ID:          "test-1",
 				Title:       "Test Product",
 				Description: "Test Description",
-				Price:       19.99,
+				Price:       20,
 			},
 		},
 	}
@@ -141,8 +141,8 @@ func TestLoadProducts(t *testing.T) {
 				if products[0].Title != "Test Product" {
 					t.Errorf("expected product title 'Test Product', got '%s'", products[0].Title)
 				}
-				if products[0].Price != 19.99 {
-					t.Errorf("expected product price 19.99, got %f", products[0].Price)
+				if products[0].Price != 20 {
+					t.Errorf("expected product price 20, got %d", products[0].Price)
 				}
 			}
 		})
@@ -160,7 +160,7 @@ func TestLoadProductsWithEnvVar(t *testing.T) {
 				ID:          "env-test-1",
 				Title:       "Env Test Product",
 				Description: "Environment Variable Test",
-				Price:       29.99,
+				Price:       30,
 			},
 		},
 	}
@@ -220,7 +220,7 @@ func TestProductStruct(t *testing.T) {
 		ID:          "1",
 		Title:       "Test",
 		Description: "Desc",
-		Price:       9.99,
+		Price:       10,
 	}
 
 	data, err := json.Marshal(product)
@@ -253,7 +253,7 @@ func TestProductsArrayResponse(t *testing.T) {
 			ID:          "1",
 			Title:       "Product 1",
 			Description: "Desc 1",
-			Price:       10.00,
+			Price:       10,
 		},
 	}
 

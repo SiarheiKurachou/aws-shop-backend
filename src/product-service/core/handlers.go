@@ -28,13 +28,12 @@ func HandleGetProductByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	products, err := LoadProducts()
+	product, found, err := LoadProductByID(productID)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "Failed to load products")
 		return
 	}
 
-	product, found := FindProductByID(products, productID)
 	if !found {
 		WriteError(w, http.StatusNotFound, "Product not found")
 		return
