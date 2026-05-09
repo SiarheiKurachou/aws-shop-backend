@@ -192,11 +192,6 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
-	productsTable.GrantReadData(listProductsFn)
-	stocksTable.GrantReadData(listProductsFn)
-	productsTable.GrantReadData(getProductByIDFn)
-	stocksTable.GrantReadData(getProductByIDFn)
-
 	createProductFn := awslambda.NewFunction(stack, _jsii_.String("create-product-lambda"), &awslambda.FunctionProps{
 		FunctionName: _jsii_.String("create-product"),
 		Runtime:      awslambda.Runtime_PROVIDED_AL2023(),
@@ -210,6 +205,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
+	productsTable.GrantReadData(listProductsFn)
+	stocksTable.GrantReadData(listProductsFn)
+	productsTable.GrantReadData(getProductByIDFn)
+	stocksTable.GrantReadData(getProductByIDFn)
 	productsTable.GrantWriteData(createProductFn)
 	stocksTable.GrantWriteData(createProductFn)
 
