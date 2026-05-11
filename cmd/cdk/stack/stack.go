@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3deployment"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awss3notifications"
 	"github.com/aws/constructs-go/constructs/v10"
 	_jsii_ "github.com/aws/jsii-runtime-go"
 )
@@ -228,6 +229,18 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
+	importFileParserFn := awslambda.NewFunction(stack, _jsii_.String("import-file-parser-lambda"), &awslambda.FunctionProps{
+		FunctionName: _jsii_.String("import-file-parser"),
+		Runtime:      awslambda.Runtime_PROVIDED_AL2023(),
+		Handler:      _jsii_.String("bootstrap"),
+		Code:         awslambda.Code_FromAsset(lambdaAssetPath("import-file-parser"), nil),
+		MemorySize:   _jsii_.Number(512),
+		Timeout:      awscdk.Duration_Seconds(_jsii_.Number(10)),
+		Environment: &map[string]*string{
+			"IMPORT_BUCKET_NAME": importsBucket.BucketName(),
+		},
+	})
+
 	productsTable.GrantReadData(listProductsFn)
 	stocksTable.GrantReadData(listProductsFn)
 	productsTable.GrantReadData(getProductByIDFn)
@@ -235,6 +248,13 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	productsTable.GrantWriteData(createProductFn)
 	stocksTable.GrantWriteData(createProductFn)
 	importsBucket.GrantPut(importProductsFileFn, _jsii_.String("uploaded/*"))
+	importsBucket.GrantRead(importFileParserFn, _jsii_.String("uploaded/*"))
+
+	importsBucket.AddEventNotification(
+		awss3.EventType_OBJECT_CREATED,
+		awss3notifications.NewLambdaDestination(importFileParserFn),
+		&awss3.NotificationKeyFilter{Prefix: _jsii_.String("uploaded/")},
+	)
 
 	api := awsapigateway.NewRestApi(stack, _jsii_.String("product-service-api"), &awsapigateway.RestApiProps{
 		RestApiName: _jsii_.String("product-service"),
@@ -324,6 +344,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("import-products-file-lambda-name"), &awscdk.CfnOutputProps{
 		Value: importProductsFileFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("import-file-parser-lambda-name"), &awscdk.CfnOutputProps{
+		Value: importFileParserFn.FunctionName(),
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("imports-bucket-name"), &awscdk.CfnOutputProps{
