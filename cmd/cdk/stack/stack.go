@@ -49,7 +49,7 @@ func uiAssetPath() *string {
 
 func swaggerAssetPath() *string {
 	candidates := []string{
-		filepath.Join("src", "product-service", "docs"),
+		filepath.Join("dist", "product-service", "docs"),
 		filepath.Join("product-service", "docs"),
 	}
 
