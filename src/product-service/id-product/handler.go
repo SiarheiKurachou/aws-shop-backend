@@ -1,11 +1,11 @@
-package main
+package idproduct
 
 import (
-	"aws-shop-backend/src/product-service/core"
+	corehandlers "aws-shop-backend/src/product-service/core/handlers"
 	"net/http"
 )
 
-// handleGetProductByID handles the GET /products/{id} request
+// HandleGetProductByID handles the GET /products/{id} request
 // @ID get-product-by-id
 // @Summary Get a product by ID
 // @Description Returns a single product by its ID
@@ -18,6 +18,6 @@ import (
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /products/{id} [get]
-func handleGetProductByID(w http.ResponseWriter, r *http.Request) {
-	core.HandleGetProductByID(w, r)
+func HandleGetProductByID(w http.ResponseWriter, r *http.Request) {
+	corehandlers.HandleGetProductByID(w, r)
 }

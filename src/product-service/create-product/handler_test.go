@@ -1,4 +1,4 @@
-package main
+package createproduct
 
 import (
 	"bytes"
@@ -149,7 +149,7 @@ func TestHandleCreateProductBadRequest(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(bodyBytes))
 			rr := httptest.NewRecorder()
 
-			handleCreateProduct(rr, req)
+			HandleCreateProduct(rr, req)
 
 			if rr.Code != tt.expectedStatus {
 				t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, tt.expectedStatus)
@@ -184,7 +184,7 @@ func TestHandleCreateProductMethodCheck(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/products", bytes.NewReader(bodyBytes))
 			rr := httptest.NewRecorder()
 
-			handleCreateProduct(rr, req)
+			HandleCreateProduct(rr, req)
 
 			// Skip validation for non-POST methods or when testing just method handling
 			if tt.method != http.MethodPost {

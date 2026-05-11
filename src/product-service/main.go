@@ -3,8 +3,11 @@
 package main
 
 import (
-	"aws-shop-backend/src/product-service/core"
-	_ "aws-shop-backend/src/product-service/docs"
+	_ "aws-shop-backend/dist/product-service/docs"
+	"aws-shop-backend/src/httphelpers"
+	createproduct "aws-shop-backend/src/product-service/create-product"
+	idproduct "aws-shop-backend/src/product-service/id-product"
+	listproducts "aws-shop-backend/src/product-service/list-products"
 	"log"
 	"net/http"
 
@@ -22,15 +25,15 @@ func main() {
 	// Handle /products with method-based routing
 	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
-			handleCreateProduct(w, r)
+			createproduct.HandleCreateProduct(w, r)
 		} else if r.Method == "GET" {
-			handleListProducts(w, r)
+			listproducts.HandleListProducts(w, r)
 		} else {
-			core.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			httphelpers.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		}
 	})
 
-	mux.HandleFunc("/products/", handleGetProductByID)
+	mux.HandleFunc("/products/", idproduct.HandleGetProductByID)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	log.Println("Server starting on :8080")

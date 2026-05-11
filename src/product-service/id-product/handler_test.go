@@ -1,4 +1,4 @@
-package main
+package idproduct
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ func TestHandleGetProductByIDSuccess(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/products/"+targetID, nil)
 	rr := httptest.NewRecorder()
 
-	handleGetProductByID(rr, req)
+	HandleGetProductByID(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -49,7 +49,7 @@ func TestHandleGetProductByIDNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/products/non-existent-id", nil)
 	rr := httptest.NewRecorder()
 
-	handleGetProductByID(rr, req)
+	HandleGetProductByID(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rr.Code)
@@ -69,7 +69,7 @@ func TestHandleGetProductByIDMissingID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/products/", nil)
 	rr := httptest.NewRecorder()
 
-	handleGetProductByID(rr, req)
+	HandleGetProductByID(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rr.Code)

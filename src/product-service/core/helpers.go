@@ -38,24 +38,6 @@ type dbStock struct {
 	Count     int    `dynamodbav:"count"`
 }
 
-func SetJSONHeaders(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-}
-
-func WriteJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
-	SetJSONHeaders(w)
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("Error encoding response: %v", err)
-	}
-}
-
-func WriteError(w http.ResponseWriter, statusCode int, message string) {
-	WriteJSON(w, statusCode, map[string]string{"error": message})
-}
-
 func ProductIDFromRequest(r *http.Request) string {
 	productID := strings.TrimPrefix(r.URL.Path, "/products/")
 	if productID == r.URL.Path || productID == "" {

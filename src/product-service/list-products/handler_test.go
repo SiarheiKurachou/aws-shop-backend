@@ -1,4 +1,4 @@
-package main
+package listproducts
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func TestHandleListProducts(t *testing.T) {
 			}
 
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(handleListProducts)
+			handler := http.HandlerFunc(HandleListProducts)
 			handler.ServeHTTP(rr, req)
 
 			if status := rr.Code; status != tt.expectedStatus {

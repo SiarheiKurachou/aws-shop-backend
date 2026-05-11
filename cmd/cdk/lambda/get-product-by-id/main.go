@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"aws-shop-backend/src/product-service/core"
+	corehandlers "aws-shop-backend/src/product-service/core/handlers"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -21,7 +21,7 @@ func handler(_ context.Context, event events.APIGatewayProxyRequest) (events.API
 	path := fmt.Sprintf("/products/%s", productID)
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	rr := httptest.NewRecorder()
-	core.HandleGetProductByID(rr, req)
+	corehandlers.HandleGetProductByID(rr, req)
 	return events.APIGatewayProxyResponse{
 		StatusCode: rr.Code,
 		Headers: map[string]string{

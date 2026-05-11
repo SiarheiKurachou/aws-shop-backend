@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 
 	"aws-shop-backend/src/product-service/core"
+	corehandlers "aws-shop-backend/src/product-service/core/handlers"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -37,7 +38,7 @@ func handler(_ context.Context, event events.APIGatewayProxyRequest) (events.API
 	rr = httptest.NewRecorder()
 
 	// Manually call HandleCreateProduct
-	core.HandleCreateProduct(rr, httpReq)
+	corehandlers.HandleCreateProduct(rr, httpReq)
 
 	// Actually, we need to pass the parsed request to create the product
 	// Let's create it directly
