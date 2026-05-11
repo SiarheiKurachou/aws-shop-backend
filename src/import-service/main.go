@@ -1,85 +1,43 @@
-package importservice
+package main
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"net/http"
-	"os"
-	"strings"
-	"time"
+
+	importproductsfile "aws-shop-backend/src/import-service/import-products-file"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-const signedURLExpiry = 5 * time.Minute
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/import", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 
-func HandleImportProductsFile(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fileName := strings.TrimSpace(event.QueryStringParameters["name"])
-	if fileName == "" {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusBadRequest,
-			Headers: map[string]string{
-				"Access-Control-Allow-Origin": "*",
-				"Content-Type":                "text/plain",
+		event := events.APIGatewayProxyRequest{
+			QueryStringParameters: map[string]string{
+				"name": r.URL.Query().Get("name"),
 			},
-			Body: "name query parameter is required",
-		}, nil
-	}
+		}
 
-	bucketName := strings.TrimSpace(os.Getenv("IMPORT_BUCKET_NAME"))
-	if bucketName == "" {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Headers: map[string]string{
-				"Access-Control-Allow-Origin": "*",
-				"Content-Type":                "text/plain",
-			},
-			Body: "IMPORT_BUCKET_NAME is not configured",
-		}, nil
-	}
+		response, err := importproductsfile.HandleImportProductsFile(context.Background(), event)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
 
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Headers: map[string]string{
-				"Access-Control-Allow-Origin": "*",
-				"Content-Type":                "text/plain",
-			},
-			Body: "failed to load AWS config",
-		}, nil
-	}
-
-	presignClient := s3.NewPresignClient(s3.NewFromConfig(cfg))
-	presignedReq, err := presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: &bucketName,
-		Key:    awsString(fmt.Sprintf("uploaded/%s", fileName)),
-	}, func(options *s3.PresignOptions) {
-		options.Expires = signedURLExpiry
+		for key, value := range response.Headers {
+			w.Header().Set(key, value)
+		}
+		w.WriteHeader(response.StatusCode)
+		_, _ = w.Write([]byte(response.Body))
 	})
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Headers: map[string]string{
-				"Access-Control-Allow-Origin": "*",
-				"Content-Type":                "text/plain",
-			},
-			Body: "failed to generate signed URL",
-		}, nil
-	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers: map[string]string{
-			"Access-Control-Allow-Origin": "*",
-			"Content-Type":                "text/plain",
-		},
-		Body: presignedReq.URL,
-	}, nil
-}
-
-func awsString(v string) *string {
-	return &v
+	log.Println("Import service server starting on :8081")
+	log.Fatal(http.ListenAndServe(":8081", mux))
 }

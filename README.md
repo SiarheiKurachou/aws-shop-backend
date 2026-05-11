@@ -11,6 +11,34 @@ set -a && source .env && set +a && go run -buildvcs=false ./src/product-service
 $(cat .env) go run -buildvcs=false ./src/product-service
 ```
 
+## Import Service
+The import service has two handlers:
+
+- `import-products-file`: API Gateway `GET /import?name=<file.csv>` returns a signed S3 PUT URL for `uploaded/<file.csv>`.
+- `import-file-parser`: S3 event consumer triggered by `s3:ObjectCreated:*` for objects with key prefix `uploaded/`.
+
+When a CSV is uploaded to the signed URL, the parser lambda reads the object as a stream, treats the first row as headers, maps each next row to a key-value record, and logs each record to CloudWatch.
+
+### Run Locally
+Run the local import-service HTTP server:
+
+```bash
+export IMPORT_BUCKET_NAME=<your-import-bucket>
+go run -buildvcs=false ./src/import-service
+```
+
+The local server listens on `:8081` and exposes:
+
+- `GET /import?name=products.csv`
+
+Example request:
+
+```bash
+curl "http://localhost:8081/import?name=products.csv"
+```
+
+The response body is the signed URL as a plain string.
+
 ## Deploy
 The CDK app deploys both the product service and the static UI from a single Go stack.
 
@@ -90,3 +118,32 @@ What gets deployed:
 - A bucket deployment that uploads Swagger files from `dist/product-service/docs/` to `docs/`
 
 The stack outputs include the API URL, website bucket name, CloudFront domain name, and Lambda function names.
+
+## Import Service Deployment Verification
+Use this checklist after `make cdk-deploy`:
+
+1. Confirm stack outputs include `products-api-url`, `imports-bucket-name`, `import-products-file-lambda-name`, and `import-file-parser-lambda-name`.
+2. Generate a signed URL:
+	- Run `curl "<products-api-url>import?name=test-products.csv"`.
+	- Verify the response is a plain URL string.
+3. Upload a CSV file with headers using the signed URL:
+	- Create a sample file:
+
+	```csv
+	title,description,price,count
+	Book,Example Book,10,3
+	Pen,Blue Ink Pen,2,10
+	Notebook,Spiral Notebook,7,5
+	```
+
+	- Example:
+	  `curl -X PUT --upload-file ./test-products.csv "<signed-url-from-step-2>"`
+4. Verify object location in S3:
+	- Check that `test-products.csv` exists under the `uploaded/` prefix in the imports bucket.
+5. Verify parser Lambda trigger and logs in CloudWatch:
+	- Open logs for `import-file-parser`.
+	- Confirm invocation happened after upload.
+	- Confirm log lines like `CSV record: map[...]` are present for parsed rows.
+6. Negative check (prefix filter):
+	- Upload a CSV outside `uploaded/` (for example to `other/test.csv`).
+	- Confirm `import-file-parser` is not triggered for that upload.

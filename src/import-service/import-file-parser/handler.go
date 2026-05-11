@@ -1,4 +1,4 @@
-package importservice
+package importfileparser
 
 import (
 	"context"
@@ -14,6 +14,10 @@ import (
 )
 
 func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
+	if len(event.Records) == 0 {
+		return nil
+	}
+
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load aws config: %w", err)
@@ -46,44 +50,13 @@ func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 			return fmt.Errorf("get s3 object %s/%s: %w", bucketName, decodedKey, err)
 		}
 
-		csvReader := csv.NewReader(obj.Body)
-		headers, readErr := csvReader.Read()
-		if readErr == io.EOF {
-			if closeErr := obj.Body.Close(); closeErr != nil {
-				return fmt.Errorf("close body %s/%s: %w", bucketName, decodedKey, closeErr)
-			}
-			continue
-		}
-		if readErr != nil {
+		recordMaps, err := parseCSVRecordsWithHeaders(obj.Body)
+		if err != nil {
 			_ = obj.Body.Close()
-			return fmt.Errorf("read headers %s/%s: %w", bucketName, decodedKey, readErr)
+			return fmt.Errorf("parse csv %s/%s: %w", bucketName, decodedKey, err)
 		}
 
-		for {
-			recordValues, readErr := csvReader.Read()
-			if readErr == io.EOF {
-				break
-			}
-			if readErr != nil {
-				_ = obj.Body.Close()
-				return fmt.Errorf("parse csv %s/%s: %w", bucketName, decodedKey, readErr)
-			}
-
-			recordMap := map[string]string{}
-			for i, header := range headers {
-				if i >= len(recordValues) {
-					recordMap[header] = ""
-					continue
-				}
-				recordMap[header] = recordValues[i]
-			}
-
-			if len(recordValues) > len(headers) {
-				for i := len(headers); i < len(recordValues); i++ {
-					recordMap[fmt.Sprintf("extra_%d", i-len(headers)+1)] = recordValues[i]
-				}
-			}
-
+		for _, recordMap := range recordMaps {
 			log.Printf("CSV record: %v", recordMap)
 		}
 
@@ -93,4 +66,50 @@ func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 	}
 
 	return nil
+}
+
+func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
+	csvReader := csv.NewReader(reader)
+	csvReader.FieldsPerRecord = -1
+	headers, readErr := csvReader.Read()
+	if readErr == io.EOF {
+		return nil, nil
+	}
+	if readErr != nil {
+		return nil, fmt.Errorf("read headers: %w", readErr)
+	}
+
+	var records []map[string]string
+	for {
+		recordValues, readErr := csvReader.Read()
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return nil, readErr
+		}
+
+		recordMap := map[string]string{}
+		for i, header := range headers {
+			if i >= len(recordValues) {
+				recordMap[header] = ""
+				continue
+			}
+			recordMap[header] = recordValues[i]
+		}
+
+		if len(recordValues) > len(headers) {
+			for i := len(headers); i < len(recordValues); i++ {
+				recordMap[fmt.Sprintf("extra_%d", i-len(headers)+1)] = recordValues[i]
+			}
+		}
+
+		records = append(records, recordMap)
+	}
+
+	return records, nil
+}
+
+func awsString(v string) *string {
+	return &v
 }
