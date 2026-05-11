@@ -145,6 +145,18 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		DistributionPaths:    &[]*string{_jsii_.String("/docs/*")},
 	})
 
+	importsBucket := awss3.NewBucket(stack, _jsii_.String("imports-bucket"), &awss3.BucketProps{
+		AutoDeleteObjects: _jsii_.Bool(true),
+		RemovalPolicy:     awscdk.RemovalPolicy_DESTROY,
+		Cors: &[]*awss3.CorsRule{
+			{
+				AllowedMethods: &[]awss3.HttpMethods{awss3.HttpMethods_PUT},
+				AllowedOrigins: &[]*string{_jsii_.String("*")},
+				AllowedHeaders: &[]*string{_jsii_.String("*")},
+			},
+		},
+	})
+
 	productsTable := awsdynamodb.NewTable(stack, _jsii_.String("products-table"), &awsdynamodb.TableProps{
 		TableName: _jsii_.String("products"),
 		PartitionKey: &awsdynamodb.Attribute{
@@ -204,12 +216,25 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
+	importProductsFileFn := awslambda.NewFunction(stack, _jsii_.String("import-products-file-lambda"), &awslambda.FunctionProps{
+		FunctionName: _jsii_.String("import-products-file"),
+		Runtime:      awslambda.Runtime_PROVIDED_AL2023(),
+		Handler:      _jsii_.String("bootstrap"),
+		Code:         awslambda.Code_FromAsset(lambdaAssetPath("import-products-file"), nil),
+		MemorySize:   _jsii_.Number(512),
+		Timeout:      awscdk.Duration_Seconds(_jsii_.Number(10)),
+		Environment: &map[string]*string{
+			"IMPORT_BUCKET_NAME": importsBucket.BucketName(),
+		},
+	})
+
 	productsTable.GrantReadData(listProductsFn)
 	stocksTable.GrantReadData(listProductsFn)
 	productsTable.GrantReadData(getProductByIDFn)
 	stocksTable.GrantReadData(getProductByIDFn)
 	productsTable.GrantWriteData(createProductFn)
 	stocksTable.GrantWriteData(createProductFn)
+	importsBucket.GrantPut(importProductsFileFn, _jsii_.String("uploaded/*"))
 
 	api := awsapigateway.NewRestApi(stack, _jsii_.String("product-service-api"), &awsapigateway.RestApiProps{
 		RestApiName: _jsii_.String("product-service"),
@@ -244,6 +269,17 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(getProductByIDFn, nil),
 		nil,
+	)
+
+	importResource := api.Root().AddResource(_jsii_.String("import"), nil)
+	importResource.AddMethod(
+		_jsii_.String("GET"),
+		awsapigateway.NewLambdaIntegration(importProductsFileFn, nil),
+		&awsapigateway.MethodOptions{
+			RequestParameters: &map[string]*bool{
+				"method.request.querystring.name": _jsii_.Bool(true),
+			},
+		},
 	)
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("products-api-url"), &awscdk.CfnOutputProps{
@@ -284,6 +320,14 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("create-product-lambda-name"), &awscdk.CfnOutputProps{
 		Value: createProductFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("import-products-file-lambda-name"), &awscdk.CfnOutputProps{
+		Value: importProductsFileFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("imports-bucket-name"), &awscdk.CfnOutputProps{
+		Value: importsBucket.BucketName(),
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("products-table-name"), &awscdk.CfnOutputProps{
