@@ -41,7 +41,7 @@ type DBStock struct {
 func main() {
 	productsTable := flag.String("products-table", "products", "DynamoDB products table name")
 	stocksTable := flag.String("stocks-table", "stocks", "DynamoDB stocks table name")
-	dataFilePath := flag.String("data-file", "src/data.json", "Path to data.json file")
+	dataFilePath := flag.String("data-file", "cmd/scripts/data.json", "Path to data.json file")
 	defaultStock := flag.Int("default-stock", 100, "Default stock count per product")
 	clearTables := flag.Bool("clear", false, "Clear tables before populating")
 	flag.Parse()

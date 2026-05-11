@@ -250,12 +250,13 @@ func loadProductsFromJSON() ([]Product, error) {
 		}
 	} else {
 		var candidates []string
-		candidates = append(candidates, "src/data.json", "../data.json", "data.json")
+		candidates = append(candidates, "cmd/scripts/data.json", "src/data.json", "../data.json", "data.json")
 
 		execPath := filepath.Join(filepath.Dir(os.Args[0]), "../data.json")
 		candidates = append(candidates, execPath)
 
 		if _, thisFile, _, ok := runtime.Caller(0); ok {
+			candidates = append(candidates, filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "cmd", "scripts", "data.json"))
 			candidates = append(candidates, filepath.Join(filepath.Dir(thisFile), "..", "..", "data.json"))
 		}
 

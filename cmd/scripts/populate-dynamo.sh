@@ -2,18 +2,18 @@
 set -e
 
 # Script to populate DynamoDB tables with test data
-# Usage: ./scripts/populate-dynamo.sh [options]
+# Usage: ./cmd/scripts/populate-dynamo.sh [options]
 # Options:
 #   --products-table TABLE_NAME   DynamoDB products table name (default: products)
 #   --stocks-table TABLE_NAME     DynamoDB stocks table name (default: stocks)
-#   --data-file FILE              Path to data.json file (default: src/data.json)
+#   --data-file FILE              Path to data.json file (default: cmd/scripts/data.json)
 #   --default-stock COUNT         Default stock count per product (default: 100)
 #   --clear                       Clear tables before populating
 #   --help                        Show this help message
 
 PRODUCTS_TABLE="products"
 STOCKS_TABLE="stocks"
-DATA_FILE="src/data.json"
+DATA_FILE="cmd/scripts/data.json"
 DEFAULT_STOCK="100"
 CLEAR=false
 

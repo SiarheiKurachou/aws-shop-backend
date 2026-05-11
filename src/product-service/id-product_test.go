@@ -13,7 +13,7 @@ func TestHandleGetProductByIDSuccess(t *testing.T) {
 		t.Fatalf("failed to load products for test setup: %v", err)
 	}
 	if len(products) == 0 {
-		t.Fatal("expected at least one product in data.json")
+		t.Fatal("expected at least one product")
 	}
 
 	targetID := products[0].ID
