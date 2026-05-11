@@ -9,11 +9,22 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const signedURLExpiry = 5 * time.Minute
+
+type presignPutObjectAPI interface {
+	PresignPutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
+}
+
+var loadAWSConfig = config.LoadDefaultConfig
+var newPresignClient = func(cfg aws.Config) presignPutObjectAPI {
+	return s3.NewPresignClient(s3.NewFromConfig(cfg))
+}
 
 func HandleImportProductsFile(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fileName := strings.TrimSpace(event.QueryStringParameters["name"])
@@ -40,7 +51,7 @@ func HandleImportProductsFile(ctx context.Context, event events.APIGatewayProxyR
 		}, nil
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	cfg, err := loadAWSConfig(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -52,7 +63,7 @@ func HandleImportProductsFile(ctx context.Context, event events.APIGatewayProxyR
 		}, nil
 	}
 
-	presignClient := s3.NewPresignClient(s3.NewFromConfig(cfg))
+	presignClient := newPresignClient(cfg)
 	presignedReq, err := presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: &bucketName,
 		Key:    awsString(fmt.Sprintf("uploaded/%s", fileName)),

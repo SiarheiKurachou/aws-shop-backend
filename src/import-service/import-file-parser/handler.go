@@ -7,23 +7,36 @@ import (
 	"io"
 	"log"
 	"net/url"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
+
+type s3ObjectAPI interface {
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
+	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+}
+
+var loadAWSConfig = config.LoadDefaultConfig
+var newS3Client = func(cfg aws.Config) s3ObjectAPI {
+	return s3.NewFromConfig(cfg)
+}
 
 func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 	if len(event.Records) == 0 {
 		return nil
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	cfg, err := loadAWSConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load aws config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := newS3Client(cfg)
 
 	for _, record := range event.Records {
 		bucketName := record.S3.Bucket.Name
@@ -63,9 +76,32 @@ func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 		if closeErr := obj.Body.Close(); closeErr != nil {
 			return fmt.Errorf("close body %s/%s: %w", bucketName, decodedKey, closeErr)
 		}
+
+		parsedKey := toParsedKey(decodedKey)
+		_, err = s3Client.CopyObject(ctx, &s3.CopyObjectInput{
+			Bucket:     awsString(bucketName),
+			CopySource: awsString(fmt.Sprintf("%s/%s", bucketName, decodedKey)),
+			Key:        awsString(parsedKey),
+		})
+		if err != nil {
+			return fmt.Errorf("copy object %s/%s to %s/%s: %w", bucketName, decodedKey, bucketName, parsedKey, err)
+		}
+
+		_, err = s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: awsString(bucketName),
+			Key:    awsString(decodedKey),
+		})
+		if err != nil {
+			return fmt.Errorf("delete original object %s/%s: %w", bucketName, decodedKey, err)
+		}
 	}
 
 	return nil
+}
+
+func toParsedKey(key string) string {
+	trimmed := strings.TrimPrefix(key, "uploaded/")
+	return "parsed/" + trimmed
 }
 
 func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
