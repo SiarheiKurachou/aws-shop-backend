@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	awscdk "github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
@@ -65,6 +66,19 @@ func swaggerAssetPath(service string) *string {
 		service,
 		service,
 	))
+}
+
+func swaggerDeploymentSources(path *string, service string) *[]awss3deployment.ISource {
+	// Add a tiny synthetic source that changes each synth so the deployment
+	// runs on every `cdk deploy`, restoring docs even if they were deleted manually.
+	return &[]awss3deployment.ISource{
+		awss3deployment.Source_Asset(path, nil),
+		awss3deployment.Source_Data(
+			_jsii_.String(".deployment-trigger"),
+			_jsii_.String(fmt.Sprintf("service=%s deployed_at=%s", service, time.Now().UTC().Format(time.RFC3339Nano))),
+			nil,
+		),
+	}
 }
 
 // websiteBucketName returns the configured bucket name, or nil to let CDK
@@ -160,11 +174,12 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		distribution.DistributionDomainName(),
 	})
 
-	awss3deployment.NewBucketDeployment(stack, _jsii_.String("epam-shop-deployment-with-invalidation"), &awss3deployment.BucketDeploymentProps{
+	mainUIDeployment := awss3deployment.NewBucketDeployment(stack, _jsii_.String("epam-shop-deployment-with-invalidation"), &awss3deployment.BucketDeploymentProps{
 		Sources: &[]awss3deployment.ISource{
 			awss3deployment.Source_Asset(uiAssetPath(), nil),
 		},
 		DestinationBucket: websiteBucket,
+		Prune:             _jsii_.Bool(false),
 		Exclude: &[]*string{
 			_jsii_.String("docs/*"),
 			_jsii_.String("docs/**/*"),
@@ -178,10 +193,8 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	// Namespaced product docs endpoint:
 	// https://<distribution>/docs/product-service/swagger.json
-	awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-product-service-deployment"), &awss3deployment.BucketDeploymentProps{
-		Sources: &[]awss3deployment.ISource{
-			awss3deployment.Source_Asset(productSwaggerDocsPath, nil),
-		},
+	productSwaggerDeployment := awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-product-service-deployment"), &awss3deployment.BucketDeploymentProps{
+		Sources:              swaggerDeploymentSources(productSwaggerDocsPath, "product-service"),
 		DestinationBucket:    websiteBucket,
 		DestinationKeyPrefix: _jsii_.String("docs/product-service/"),
 		Distribution:         distribution,
@@ -190,15 +203,16 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	// Namespaced import docs endpoint:
 	// https://<distribution>/docs/import-service/swagger.json
-	awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-import-service-deployment"), &awss3deployment.BucketDeploymentProps{
-		Sources: &[]awss3deployment.ISource{
-			awss3deployment.Source_Asset(importSwaggerDocsPath, nil),
-		},
+	importSwaggerDeployment := awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-import-service-deployment"), &awss3deployment.BucketDeploymentProps{
+		Sources:              swaggerDeploymentSources(importSwaggerDocsPath, "import-service"),
 		DestinationBucket:    websiteBucket,
 		DestinationKeyPrefix: _jsii_.String("docs/import-service/"),
 		Distribution:         distribution,
 		DistributionPaths:    &[]*string{_jsii_.String("/docs/import-service/*")},
 	})
+
+	productSwaggerDeployment.Node().AddDependency(mainUIDeployment)
+	importSwaggerDeployment.Node().AddDependency(mainUIDeployment)
 
 	importsBucket := awss3.NewBucket(stack, _jsii_.String("imports-bucket"), &awss3.BucketProps{
 		AutoDeleteObjects: _jsii_.Bool(true),
