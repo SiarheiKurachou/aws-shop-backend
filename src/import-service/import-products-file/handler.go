@@ -37,7 +37,7 @@ var newPresignClient = func(cfg aws.Config) presignPutObjectAPI {
 // @Success      200   {string}  string  "Presigned URL"
 // @Failure      400   {string}  string  "Missing file name"
 // @Failure      500   {string}  string  "Server error"
-// @Router       /import-products-file [get]
+// @Router       /import [get]
 func HandleImportProductsFile(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fileName := strings.TrimSpace(event.QueryStringParameters["name"])
 	if fileName == "" {

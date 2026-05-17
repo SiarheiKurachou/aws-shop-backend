@@ -36,7 +36,7 @@ var newS3Client = func(cfg aws.Config) s3ObjectAPI {
 // @Param        event  body  object  true  "S3 Event"
 // @Success      200    {string}  string  "ok"
 // @Failure      500    {string}  string  "error"
-// @Router       /import-file-parser [post]
+// @Router       /import [post]
 func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 	if len(event.Records) == 0 {
 		return nil
