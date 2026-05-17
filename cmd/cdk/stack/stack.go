@@ -165,6 +165,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 			awss3deployment.Source_Asset(uiAssetPath(), nil),
 		},
 		DestinationBucket: websiteBucket,
+		Exclude: &[]*string{
+			_jsii_.String("docs/*"),
+			_jsii_.String("docs/**/*"),
+		},
 		Distribution:      distribution,
 		DistributionPaths: &[]*string{_jsii_.String("/*")},
 	})
@@ -299,8 +303,8 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	productsTable.GrantWriteData(createProductFn)
 	stocksTable.GrantWriteData(createProductFn)
 	importsBucket.GrantPut(importProductsFileFn, _jsii_.String("uploaded/*"))
-	importsBucket.GrantDelete(importProductsFileFn, _jsii_.String("uploaded/*"))
 	importsBucket.GrantRead(importFileParserFn, _jsii_.String("uploaded/*"))
+	importsBucket.GrantDelete(importFileParserFn, _jsii_.String("uploaded/*"))
 	importsBucket.GrantPut(importFileParserFn, _jsii_.String("parsed/*"))
 
 	importsBucket.AddEventNotification(
