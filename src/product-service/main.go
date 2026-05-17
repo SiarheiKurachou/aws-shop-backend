@@ -3,7 +3,6 @@
 package main
 
 import (
-	_ "aws-shop-backend/dist/product-service/docs"
 	"aws-shop-backend/src/httphelpers"
 	createproduct "aws-shop-backend/src/product-service/create-product"
 	idproduct "aws-shop-backend/src/product-service/id-product"
