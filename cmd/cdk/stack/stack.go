@@ -119,12 +119,40 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	}
 	websiteBucket := awss3.NewBucket(stack, _jsii_.String("epam-shop-bucket"), websiteBucketProps)
 
+	spaRewriteFunction := awscloudfront.NewFunction(stack, _jsii_.String("spa-rewrite-function"), &awscloudfront.FunctionProps{
+		Code: awscloudfront.FunctionCode_FromInline(_jsii_.String(`function handler(event) {
+	var request = event.request;
+	var uri = request.uri;
+
+	if (uri === '/docs' || uri.indexOf('/docs/') === 0) {
+		return request;
+	}
+
+	if (uri.indexOf('.') === -1) {
+		request.uri = '/index.html';
+	}
+
+	return request;
+}`)),
+	})
+
 	distribution := awscloudfront.NewDistribution(stack, _jsii_.String("epam-shop-distribution"), &awscloudfront.DistributionProps{
 		DefaultBehavior: &awscloudfront.BehaviorOptions{
 			Origin:               awscloudfrontorigins.S3BucketOrigin_WithOriginAccessControl(websiteBucket, nil),
 			ViewerProtocolPolicy: awscloudfront.ViewerProtocolPolicy_REDIRECT_TO_HTTPS,
+			FunctionAssociations: &[]*awscloudfront.FunctionAssociation{
+				{
+					EventType: awscloudfront.FunctionEventType_VIEWER_REQUEST,
+					Function:  spaRewriteFunction,
+				},
+			},
 		},
 		DefaultRootObject: _jsii_.String("index.html"),
+	})
+
+	allowedOrigin := awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+		_jsii_.String("https://"),
+		distribution.DistributionDomainName(),
 	})
 
 	awss3deployment.NewBucketDeployment(stack, _jsii_.String("epam-shop-deployment-with-invalidation"), &awss3deployment.BucketDeploymentProps{
@@ -214,6 +242,7 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		Environment: &map[string]*string{
 			"PRODUCTS_TABLE_NAME": productsTable.TableName(),
 			"STOCKS_TABLE_NAME":   stocksTable.TableName(),
+			"ALLOWED_ORIGIN":      allowedOrigin,
 		},
 	})
 
@@ -265,7 +294,15 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 				_jsii_.String("POST"),
 				_jsii_.String("OPTIONS"),
 			},
-			AllowOrigins: awsapigateway.Cors_ALL_ORIGINS(),
+			AllowOrigins: &[]*string{allowedOrigin},
+			AllowHeaders: &[]*string{
+				_jsii_.String("Content-Type"),
+				_jsii_.String("Authorization"),
+				_jsii_.String("X-Amz-Date"),
+				_jsii_.String("X-Api-Key"),
+				_jsii_.String("X-Amz-Security-Token"),
+			},
+			AllowCredentials: _jsii_.Bool(true),
 		},
 		DeployOptions: &awsapigateway.StageOptions{
 			StageName: _jsii_.String("prod"),

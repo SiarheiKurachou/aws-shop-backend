@@ -4,11 +4,17 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 )
 
 func SetJSONHeaders(w http.ResponseWriter) {
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "*"
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 }
 
 func WriteJSON(w http.ResponseWriter, statusCode int, payload interface{}) {

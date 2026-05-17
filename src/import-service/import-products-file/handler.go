@@ -26,6 +26,18 @@ var newPresignClient = func(cfg aws.Config) presignPutObjectAPI {
 	return s3.NewPresignClient(s3.NewFromConfig(cfg))
 }
 
+// HandleImportProductsFile generates a presigned S3 URL for file upload.
+//
+// @Summary      Get presigned S3 upload URL
+// @Description  Returns a presigned URL to upload a file to S3.
+// @Tags         import
+// @Accept       json
+// @Produce      json
+// @Param        name  query  string  true  "File name"
+// @Success      200   {string}  string  "Presigned URL"
+// @Failure      400   {string}  string  "Missing file name"
+// @Failure      500   {string}  string  "Server error"
+// @Router       /import-products-file [get]
 func HandleImportProductsFile(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fileName := strings.TrimSpace(event.QueryStringParameters["name"])
 	if fileName == "" {

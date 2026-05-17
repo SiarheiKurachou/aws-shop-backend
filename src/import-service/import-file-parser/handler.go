@@ -26,6 +26,17 @@ var newS3Client = func(cfg aws.Config) s3ObjectAPI {
 	return s3.NewFromConfig(cfg)
 }
 
+// HandleImportFileParser handles S3 event to parse uploaded CSV files.
+//
+// @Summary      Parse uploaded CSV file from S3
+// @Description  Triggered by S3 event, reads CSV, logs records, moves file to parsed, and deletes original.
+// @Tags         import
+// @Accept       json
+// @Produce      json
+// @Param        event  body  events.S3Event  true  "S3 Event"
+// @Success      200    {string}  string  "ok"
+// @Failure      500    {string}  string  "error"
+// @Router       /import-file-parser [post]
 func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 	if len(event.Records) == 0 {
 		return nil
