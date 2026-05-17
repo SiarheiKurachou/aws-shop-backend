@@ -19,8 +19,9 @@ build-lambdas:
 
 build-swagger:
 	@command -v swag >/dev/null 2>&1 || (echo "swag CLI not found; install with: go install github.com/swaggo/swag/cmd/swag@latest" && exit 1)
-	mkdir -p dist/product-service/docs
-	swag init -g main.go -d src/product-service -o dist/product-service/docs
+	mkdir -p dist/docs/product-service dist/docs/import-service
+	swag init -g main.go -d src/product-service -o dist/docs/product-service
+	swag init -g main.go -d src/import-service -o dist/docs/import-service
 
 cdk-clean:
 	rm -rf dist && rm -rf cdk.out

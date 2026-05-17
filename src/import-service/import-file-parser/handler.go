@@ -33,7 +33,7 @@ var newS3Client = func(cfg aws.Config) s3ObjectAPI {
 // @Tags         import
 // @Accept       json
 // @Produce      json
-// @Param        event  body  events.S3Event  true  "S3 Event"
+// @Param        event  body  object  true  "S3 Event"
 // @Success      200    {string}  string  "ok"
 // @Failure      500    {string}  string  "error"
 // @Router       /import-file-parser [post]

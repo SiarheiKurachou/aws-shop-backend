@@ -48,9 +48,10 @@ func uiAssetPath() *string {
 	panic("frontend asset directory not found; expected dist-ui")
 }
 
-func swaggerAssetPath() *string {
+func swaggerAssetPath(service string) *string {
 	candidates := []string{
-		filepath.Join("dist", "product-service", "docs"),
+		filepath.Join("dist", "docs", service),
+		filepath.Join("cdk", "dist", "docs", service),
 	}
 
 	for _, candidate := range candidates {
@@ -59,7 +60,11 @@ func swaggerAssetPath() *string {
 		}
 	}
 
-	panic("swagger asset directory not found; expected dist/product-service/docs (run `make build-swagger`)")
+	panic(fmt.Sprintf(
+		"swagger asset directory for %s not found; expected dist/docs/%s (run `make build-swagger`)",
+		service,
+		service,
+	))
 }
 
 // websiteBucketName returns the configured bucket name, or nil to let CDK
@@ -164,14 +169,31 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		DistributionPaths: &[]*string{_jsii_.String("/*")},
 	})
 
-	awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-deployment"), &awss3deployment.BucketDeploymentProps{
+	productSwaggerDocsPath := swaggerAssetPath("product-service")
+	importSwaggerDocsPath := swaggerAssetPath("import-service")
+
+	// Namespaced product docs endpoint:
+	// https://<distribution>/docs/product-service/swagger.json
+	awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-product-service-deployment"), &awss3deployment.BucketDeploymentProps{
 		Sources: &[]awss3deployment.ISource{
-			awss3deployment.Source_Asset(swaggerAssetPath(), nil),
+			awss3deployment.Source_Asset(productSwaggerDocsPath, nil),
 		},
 		DestinationBucket:    websiteBucket,
-		DestinationKeyPrefix: _jsii_.String("docs/"),
+		DestinationKeyPrefix: _jsii_.String("docs/product-service/"),
 		Distribution:         distribution,
-		DistributionPaths:    &[]*string{_jsii_.String("/docs/*")},
+		DistributionPaths:    &[]*string{_jsii_.String("/docs/product-service/*")},
+	})
+
+	// Namespaced import docs endpoint:
+	// https://<distribution>/docs/import-service/swagger.json
+	awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-import-service-deployment"), &awss3deployment.BucketDeploymentProps{
+		Sources: &[]awss3deployment.ISource{
+			awss3deployment.Source_Asset(importSwaggerDocsPath, nil),
+		},
+		DestinationBucket:    websiteBucket,
+		DestinationKeyPrefix: _jsii_.String("docs/import-service/"),
+		Distribution:         distribution,
+		DistributionPaths:    &[]*string{_jsii_.String("/docs/import-service/*")},
 	})
 
 	importsBucket := awss3.NewBucket(stack, _jsii_.String("imports-bucket"), &awss3.BucketProps{
@@ -351,19 +373,35 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		Value: distribution.DistributionDomainName(),
 	})
 
-	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-json-url"), &awscdk.CfnOutputProps{
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-product-json-url"), &awscdk.CfnOutputProps{
 		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
 			_jsii_.String("https://"),
 			distribution.DistributionDomainName(),
-			_jsii_.String("/docs/swagger.json"),
+			_jsii_.String("/docs/product-service/swagger.json"),
 		}),
 	})
 
-	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-yaml-url"), &awscdk.CfnOutputProps{
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-product-yaml-url"), &awscdk.CfnOutputProps{
 		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
 			_jsii_.String("https://"),
 			distribution.DistributionDomainName(),
-			_jsii_.String("/docs/swagger.yaml"),
+			_jsii_.String("/docs/product-service/swagger.yaml"),
+		}),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-import-json-url"), &awscdk.CfnOutputProps{
+		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+			_jsii_.String("https://"),
+			distribution.DistributionDomainName(),
+			_jsii_.String("/docs/import-service/swagger.json"),
+		}),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-import-yaml-url"), &awscdk.CfnOutputProps{
+		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+			_jsii_.String("https://"),
+			distribution.DistributionDomainName(),
+			_jsii_.String("/docs/import-service/swagger.yaml"),
 		}),
 	})
 
