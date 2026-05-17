@@ -299,8 +299,9 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 	productsTable.GrantWriteData(createProductFn)
 	stocksTable.GrantWriteData(createProductFn)
 	importsBucket.GrantPut(importProductsFileFn, _jsii_.String("uploaded/*"))
+	importsBucket.GrantDelete(importProductsFileFn, _jsii_.String("uploaded/*"))
 	importsBucket.GrantRead(importFileParserFn, _jsii_.String("uploaded/*"))
-	importsBucket.GrantWrite(importFileParserFn, nil, &[]*string{_jsii_.String("parsed/*")})
+	importsBucket.GrantPut(importFileParserFn, _jsii_.String("parsed/*"))
 
 	importsBucket.AddEventNotification(
 		awss3.EventType_OBJECT_CREATED,
