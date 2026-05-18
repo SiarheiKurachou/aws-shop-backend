@@ -10,15 +10,18 @@ test:
 	go test ./...
 
 build-lambdas:
-	mkdir -p dist/get-products-list dist/get-product-by-id dist/create-product
+	mkdir -p dist/get-products-list dist/get-product-by-id dist/create-product dist/import-products-file dist/import-file-parser
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/get-products-list/bootstrap ./cmd/cdk/lambda/get-products-list
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/get-product-by-id/bootstrap ./cmd/cdk/lambda/get-product-by-id
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -tags lambda_create_product -o dist/create-product/bootstrap ./cmd/cdk/lambda/create-product
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/import-products-file/bootstrap ./cmd/cdk/lambda/import-products-file
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/import-file-parser/bootstrap ./cmd/cdk/lambda/import-file-parser
 
 build-swagger:
 	@command -v swag >/dev/null 2>&1 || (echo "swag CLI not found; install with: go install github.com/swaggo/swag/cmd/swag@latest" && exit 1)
-	mkdir -p dist/product-service/docs
-	swag init -g main.go -d src/product-service -o dist/product-service/docs
+	mkdir -p dist/docs/product-service dist/docs/import-service
+	swag init -g main.go -d src/product-service -o dist/docs/product-service
+	swag init -g main.go -d src/import-service -o dist/docs/import-service
 
 cdk-clean:
 	rm -rf dist && rm -rf cdk.out
