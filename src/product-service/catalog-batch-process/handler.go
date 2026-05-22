@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"aws-shop-backend/src/product-service/core"
+	"aws-shop-backend/src/product-service/common"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,7 +17,7 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
 
-var createProduct = core.CreateProduct
+var createProduct = common.CreateProduct
 var loadAWSConfig = config.LoadDefaultConfig
 
 type snsPublishAPI interface {
@@ -30,10 +30,10 @@ var newSNSClient = func(cfg aws.Config) snsPublishAPI {
 
 // HandleCatalogBatchProcess processes SQS records and creates products for each message.
 func HandleCatalogBatchProcess(ctx context.Context, event events.SQSEvent) error {
-	createdProducts := make([]core.Product, 0, len(event.Records))
+	createdProducts := make([]common.Product, 0, len(event.Records))
 
 	for _, message := range event.Records {
-		var req core.CreateProductRequest
+		var req common.CreateProductRequest
 		if err := json.Unmarshal([]byte(message.Body), &req); err != nil {
 			return fmt.Errorf("unmarshal SQS message %s: %w", message.MessageId, err)
 		}
@@ -90,7 +90,7 @@ func HandleCatalogBatchProcess(ctx context.Context, event events.SQSEvent) error
 	return nil
 }
 
-func priceCategory(products []core.Product) string {
+func priceCategory(products []common.Product) string {
 	for _, product := range products {
 		if product.Price >= 100 {
 			return "premium"

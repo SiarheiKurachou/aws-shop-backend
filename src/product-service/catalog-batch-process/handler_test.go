@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"aws-shop-backend/src/product-service/core"
+	"aws-shop-backend/src/product-service/common"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -41,10 +41,10 @@ func TestHandleCatalogBatchProcessSuccess(t *testing.T) {
 		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
 	})
 
-	requests := make([]core.CreateProductRequest, 0)
-	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
+	requests := make([]common.CreateProductRequest, 0)
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
 		requests = append(requests, req)
-		return core.Product{ID: "p-id", Title: req.Title}, nil
+		return common.Product{ID: "p-id", Title: req.Title}, nil
 	}
 
 	loadAWSConfig = func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
@@ -116,8 +116,8 @@ func TestHandleCatalogBatchProcessPremiumCategory(t *testing.T) {
 		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
 	})
 
-	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
-		return core.Product{ID: "p-id", Price: 250}, nil
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		return common.Product{ID: "p-id", Price: 250}, nil
 	}
 
 	loadAWSConfig = func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
@@ -155,8 +155,8 @@ func TestHandleCatalogBatchProcessInvalidJSON(t *testing.T) {
 		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
 	})
 
-	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
-		return core.Product{}, nil
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		return common.Product{}, nil
 	}
 
 	event := events.SQSEvent{
@@ -183,8 +183,8 @@ func TestHandleCatalogBatchProcessCreateProductError(t *testing.T) {
 		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
 	})
 
-	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
-		return core.Product{}, errors.New("boom")
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		return common.Product{}, errors.New("boom")
 	}
 
 	event := events.SQSEvent{
@@ -213,8 +213,8 @@ func TestHandleCatalogBatchProcessMissingTopicARN(t *testing.T) {
 
 	_ = os.Unsetenv("CREATE_PRODUCT_TOPIC_ARN")
 
-	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
-		return core.Product{ID: "p-id"}, nil
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		return common.Product{ID: "p-id"}, nil
 	}
 
 	err := HandleCatalogBatchProcess(context.Background(), events.SQSEvent{
@@ -243,8 +243,8 @@ func TestHandleCatalogBatchProcessPublishError(t *testing.T) {
 
 	_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", "arn:aws:sns:us-east-1:123:createProductTopic")
 
-	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
-		return core.Product{ID: "p-id"}, nil
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		return common.Product{ID: "p-id"}, nil
 	}
 
 	loadAWSConfig = func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {

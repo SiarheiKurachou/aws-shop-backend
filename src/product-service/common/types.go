@@ -1,4 +1,4 @@
-package core
+package common
 
 // Product represents a product in the shop.
 type Product struct {

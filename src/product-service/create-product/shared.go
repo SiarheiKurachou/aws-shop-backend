@@ -1,7 +1,7 @@
 package createproduct
 
-import "aws-shop-backend/src/product-service/core"
+import "aws-shop-backend/src/product-service/common"
 
 // Type aliases retained for Swagger annotations.
-type CreateProductRequest = core.CreateProductRequest
-type CreateProductResponse = core.CreateProductResponse
+type CreateProductRequest = common.CreateProductRequest
+type CreateProductResponse = common.CreateProductResponse
