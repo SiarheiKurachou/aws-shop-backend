@@ -323,12 +323,31 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		TopicName: _jsii_.String("createProductTopic"),
 	})
 
-	notificationEmail := os.Getenv("PRODUCT_NOTIFICATION_EMAIL")
-	if strings.TrimSpace(notificationEmail) == "" {
-		notificationEmail = "your-email@example.com"
+	budgetNotificationEmail := strings.TrimSpace(os.Getenv("PRODUCT_NOTIFICATION_EMAIL"))
+	if budgetNotificationEmail == "" {
+		budgetNotificationEmail = "your-email@example.com"
 	}
 
-	createProductTopic.AddSubscription(awssnssubscriptions.NewEmailSubscription(_jsii_.String(notificationEmail), nil))
+	premiumNotificationEmail := strings.TrimSpace(os.Getenv("PRODUCT_NOTIFICATION_EMAIL_PREMIUM"))
+	if premiumNotificationEmail == "" {
+		premiumNotificationEmail = "your-second-email@example.com"
+	}
+
+	createProductTopic.AddSubscription(awssnssubscriptions.NewEmailSubscription(_jsii_.String(budgetNotificationEmail), &awssnssubscriptions.EmailSubscriptionProps{
+		FilterPolicy: &map[string]awssns.SubscriptionFilter{
+			"priceCategory": awssns.SubscriptionFilter_StringFilter(&awssns.StringConditions{
+				Allowlist: &[]*string{_jsii_.String("budget")},
+			}),
+		},
+	}))
+
+	createProductTopic.AddSubscription(awssnssubscriptions.NewEmailSubscription(_jsii_.String(premiumNotificationEmail), &awssnssubscriptions.EmailSubscriptionProps{
+		FilterPolicy: &map[string]awssns.SubscriptionFilter{
+			"priceCategory": awssns.SubscriptionFilter_StringFilter(&awssns.StringConditions{
+				Allowlist: &[]*string{_jsii_.String("premium")},
+			}),
+		},
+	}))
 
 	catalogBatchProcessFn := awslambda.NewFunction(stack, _jsii_.String("catalog-batch-process-lambda"), &awslambda.FunctionProps{
 		FunctionName: _jsii_.String("catalogBatchProcess"),

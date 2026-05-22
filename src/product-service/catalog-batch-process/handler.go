@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
 
 var createProduct = core.CreateProduct
@@ -75,10 +76,26 @@ func HandleCatalogBatchProcess(ctx context.Context, event events.SQSEvent) error
 		TopicArn: aws.String(topicARN),
 		Subject:  aws.String("Products created"),
 		Message:  aws.String(string(eventPayload)),
+		MessageAttributes: map[string]snstypes.MessageAttributeValue{
+			"priceCategory": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String(priceCategory(createdProducts)),
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("publish create product event: %w", err)
 	}
 
 	return nil
+}
+
+func priceCategory(products []core.Product) string {
+	for _, product := range products {
+		if product.Price >= 100 {
+			return "premium"
+		}
+	}
+
+	return "budget"
 }

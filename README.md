@@ -60,6 +60,7 @@ export CDK_DEFAULT_ACCOUNT="$AWS_ACCOUNT_ID"
 
 # Required for SNS email subscription on createProductTopic.
 export PRODUCT_NOTIFICATION_EMAIL=<your-email@example.com>
+export PRODUCT_NOTIFICATION_EMAIL_PREMIUM=<your-second-email@example.com>
 
 # Optional: override the default website bucket name.
 export S3_BUCKET_NAME=<your-unique-bucket-name>
@@ -154,6 +155,7 @@ Use this checklist after `make cdk-deploy`:
 ## SNS Notifications
 The stack creates an SNS topic named `createProductTopic` and subscribes an email endpoint to it.
 
-- Set `PRODUCT_NOTIFICATION_EMAIL` before `make cdk-deploy` to use your email for the SNS subscription.
-- After deployment, confirm the subscription email in your inbox.
-- The `catalogBatchProcess` lambda publishes a notification to this topic after it creates products from SQS batch messages.
+- Set `PRODUCT_NOTIFICATION_EMAIL` for the `budget` filter subscription.
+- Set `PRODUCT_NOTIFICATION_EMAIL_PREMIUM` for the `premium` filter subscription.
+- The `catalogBatchProcess` lambda publishes a `priceCategory` message attribute (`budget` or `premium`) so SNS filter policies route to different emails.
+- After deployment, confirm both SNS subscription confirmation emails in your inbox.

@@ -89,6 +89,62 @@ func TestHandleCatalogBatchProcessSuccess(t *testing.T) {
 	if !strings.Contains(message, `"count":2`) {
 		t.Fatalf("expected count in SNS message, got: %s", message)
 	}
+
+	if mockSNS.publishInput.MessageAttributes == nil {
+		t.Fatal("expected message attributes")
+	}
+
+	priceCategoryAttr, exists := mockSNS.publishInput.MessageAttributes["priceCategory"]
+	if !exists {
+		t.Fatal("expected priceCategory message attribute")
+	}
+
+	if got := aws.ToString(priceCategoryAttr.StringValue); got != "budget" {
+		t.Fatalf("expected budget price category, got: %s", got)
+	}
+}
+
+func TestHandleCatalogBatchProcessPremiumCategory(t *testing.T) {
+	originalCreateProduct := createProduct
+	originalLoadAWSConfig := loadAWSConfig
+	originalNewSNSClient := newSNSClient
+	originalTopicARN := os.Getenv("CREATE_PRODUCT_TOPIC_ARN")
+	t.Cleanup(func() {
+		createProduct = originalCreateProduct
+		loadAWSConfig = originalLoadAWSConfig
+		newSNSClient = originalNewSNSClient
+		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
+	})
+
+	createProduct = func(req core.CreateProductRequest) (core.Product, error) {
+		return core.Product{ID: "p-id", Price: 250}, nil
+	}
+
+	loadAWSConfig = func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+
+	mockSNS := &mockSNSClient{}
+	newSNSClient = func(aws.Config) snsPublishAPI {
+		return mockSNS
+	}
+	_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", "arn:aws:sns:us-east-1:123:createProductTopic")
+
+	err := HandleCatalogBatchProcess(context.Background(), events.SQSEvent{
+		Records: []events.SQSMessage{{MessageId: "m1", Body: `{"title":"A","description":"d1","price":250,"count":1}`}},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	priceCategoryAttr, exists := mockSNS.publishInput.MessageAttributes["priceCategory"]
+	if !exists {
+		t.Fatal("expected priceCategory message attribute")
+	}
+
+	if got := aws.ToString(priceCategoryAttr.StringValue); got != "premium" {
+		t.Fatalf("expected premium price category, got: %s", got)
+	}
 }
 
 func TestHandleCatalogBatchProcessInvalidJSON(t *testing.T) {
