@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -144,7 +145,7 @@ func toParsedKey(key string) string {
 	return "parsed/" + trimmed
 }
 
-func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
+func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]any, error) {
 	csvReader := csv.NewReader(reader)
 	csvReader.FieldsPerRecord = -1
 	headers, readErr := csvReader.Read()
@@ -155,7 +156,12 @@ func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
 		return nil, fmt.Errorf("read headers: %w", readErr)
 	}
 
-	var records []map[string]string
+	var records []map[string]any
+	numericFields := map[string]struct{}{
+		"price": {},
+		"count": {},
+	}
+	rowIndex := 1
 	for {
 		recordValues, readErr := csvReader.Read()
 		if readErr == io.EOF {
@@ -165,13 +171,33 @@ func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
 			return nil, readErr
 		}
 
-		recordMap := map[string]string{}
+		recordMap := map[string]any{}
 		for i, header := range headers {
+			header = strings.TrimSpace(header)
+			_, isNumericField := numericFields[header]
 			if i >= len(recordValues) {
-				recordMap[header] = ""
+				if !isNumericField {
+					recordMap[header] = ""
+				}
 				continue
 			}
-			recordMap[header] = recordValues[i]
+
+			value := strings.TrimSpace(recordValues[i])
+			if isNumericField {
+				if value == "" {
+					continue
+				}
+
+				parsedInt, convErr := strconv.Atoi(value)
+				if convErr != nil {
+					return nil, fmt.Errorf("parse %s in row %d: %w", header, rowIndex, convErr)
+				}
+
+				recordMap[header] = parsedInt
+				continue
+			}
+
+			recordMap[header] = value
 		}
 
 		if len(recordValues) > len(headers) {
@@ -181,6 +207,7 @@ func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
 		}
 
 		records = append(records, recordMap)
+		rowIndex++
 	}
 
 	return records, nil

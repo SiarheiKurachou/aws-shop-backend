@@ -175,6 +175,116 @@ func TestHandleCatalogBatchProcessInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestHandleCatalogBatchProcessNumericStrings(t *testing.T) {
+	originalCreateProduct := createProduct
+	originalLoadAWSConfig := loadAWSConfig
+	originalNewSNSClient := newSNSClient
+	originalTopicARN := os.Getenv("CREATE_PRODUCT_TOPIC_ARN")
+	t.Cleanup(func() {
+		createProduct = originalCreateProduct
+		loadAWSConfig = originalLoadAWSConfig
+		newSNSClient = originalNewSNSClient
+		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
+	})
+
+	requests := make([]common.CreateProductRequest, 0)
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		requests = append(requests, req)
+		return common.Product{ID: "p-id", Title: req.Title, Price: req.Price, Count: req.Count}, nil
+	}
+
+	loadAWSConfig = func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+
+	newSNSClient = func(aws.Config) snsPublishAPI {
+		return &mockSNSClient{}
+	}
+	_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", "arn:aws:sns:us-east-1:123:createProductTopic")
+
+	err := HandleCatalogBatchProcess(context.Background(), events.SQSEvent{
+		Records: []events.SQSMessage{{MessageId: "m1", Body: `{"title":"A","description":"d1","price":"10","count":"2"}`}},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if len(requests) != 1 {
+		t.Fatalf("expected 1 createProduct call, got: %d", len(requests))
+	}
+
+	if requests[0].Price != 10 || requests[0].Count != 2 {
+		t.Fatalf("expected parsed numeric strings, got price=%d count=%d", requests[0].Price, requests[0].Count)
+	}
+}
+
+func TestHandleCatalogBatchProcessBOMPrefixedTitleKey(t *testing.T) {
+	originalCreateProduct := createProduct
+	originalLoadAWSConfig := loadAWSConfig
+	originalNewSNSClient := newSNSClient
+	originalTopicARN := os.Getenv("CREATE_PRODUCT_TOPIC_ARN")
+	t.Cleanup(func() {
+		createProduct = originalCreateProduct
+		loadAWSConfig = originalLoadAWSConfig
+		newSNSClient = originalNewSNSClient
+		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
+	})
+
+	requests := make([]common.CreateProductRequest, 0)
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		requests = append(requests, req)
+		return common.Product{ID: "p-id", Title: req.Title, Price: req.Price, Count: req.Count}, nil
+	}
+
+	loadAWSConfig = func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+
+	newSNSClient = func(aws.Config) snsPublishAPI {
+		return &mockSNSClient{}
+	}
+	_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", "arn:aws:sns:us-east-1:123:createProductTopic")
+
+	err := HandleCatalogBatchProcess(context.Background(), events.SQSEvent{
+		Records: []events.SQSMessage{{MessageId: "m1", Body: `{"\ufefftitle":"A","description":"d1","price":10,"count":2}`}},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if len(requests) != 1 {
+		t.Fatalf("expected 1 createProduct call, got: %d", len(requests))
+	}
+
+	if requests[0].Title != "A" {
+		t.Fatalf("expected title to be decoded from BOM-prefixed key, got: %q", requests[0].Title)
+	}
+}
+
+func TestHandleCatalogBatchProcessInvalidNumericString(t *testing.T) {
+	originalCreateProduct := createProduct
+	originalTopicARN := os.Getenv("CREATE_PRODUCT_TOPIC_ARN")
+	t.Cleanup(func() {
+		createProduct = originalCreateProduct
+		_ = os.Setenv("CREATE_PRODUCT_TOPIC_ARN", originalTopicARN)
+	})
+
+	createProduct = func(req common.CreateProductRequest) (common.Product, error) {
+		return common.Product{}, nil
+	}
+
+	err := HandleCatalogBatchProcess(context.Background(), events.SQSEvent{
+		Records: []events.SQSMessage{{MessageId: "m1", Body: `{"title":"A","description":"d1","price":"abc","count":1}`}},
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "unmarshal SQS message m1") {
+		t.Fatalf("expected unmarshal error with message id, got: %v", err)
+	}
+}
+
 func TestHandleCatalogBatchProcessCreateProductError(t *testing.T) {
 	originalCreateProduct := createProduct
 	originalTopicARN := os.Getenv("CREATE_PRODUCT_TOPIC_ARN")

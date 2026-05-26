@@ -72,14 +72,27 @@ func TestParseCSVRecordsWithHeaders(t *testing.T) {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
-	expected := []map[string]string{
-		{"title": "Book", "price": "10", "count": "3"},
-		{"title": "Pen", "price": "2", "count": ""},
-		{"title": "Notebook", "price": "7", "count": "15", "extra_1": "unexpected"},
+	expected := []map[string]any{
+		{"title": "Book", "price": 10, "count": 3},
+		{"title": "Pen", "price": 2},
+		{"title": "Notebook", "price": 7, "count": 15, "extra_1": "unexpected"},
 	}
 
 	if !reflect.DeepEqual(expected, records) {
 		t.Fatalf("expected records %+v, got %+v", expected, records)
+	}
+}
+
+func TestParseCSVRecordsWithHeaders_InvalidNumericField(t *testing.T) {
+	input := strings.NewReader("title,price,count\nBook,abc,3\n")
+
+	_, err := parseCSVRecordsWithHeaders(input)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "parse price in row 1") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -158,7 +171,7 @@ func TestHandleImportFileParser_MovesFileToParsedPrefix(t *testing.T) {
 		t.Fatalf("expected queue URL to match env, got %q", got)
 	}
 
-	if got := aws.ToString(mockSQS.sendMessageInputs[0].MessageBody); got != `{"price":"10","title":"Book"}` && got != `{"title":"Book","price":"10"}` {
+	if got := aws.ToString(mockSQS.sendMessageInputs[0].MessageBody); got != `{"price":10,"title":"Book"}` && got != `{"title":"Book","price":10}` {
 		t.Fatalf("unexpected message body: %s", got)
 	}
 }
