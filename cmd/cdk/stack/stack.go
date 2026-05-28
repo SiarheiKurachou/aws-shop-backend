@@ -122,13 +122,13 @@ func deploymentEnv() *awscdk.Environment {
 	}
 }
 
-// NewProductServiceStack creates the product service infrastructure in the
+// NewProductServiceStack creates the product and import service infrastructure in the
 // existing EPAM shop website stack.
 //
 // Expected Lambda artifacts:
 // - cdk/dist/get-products-list/bootstrap
 // - cdk/dist/get-product-by-id/bootstrap
-func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
+func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *string) awscdk.Stack {
 	stack := awscdk.NewStack(scope, _jsii_.String("epam-shop-website-stack"), &awscdk.StackProps{
 		StackName: _jsii_.String("epam-shop-website-stack"),
 		Env:       deploymentEnv(),
@@ -195,6 +195,7 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	productSwaggerDocsPath := swaggerAssetPath("product-service")
 	importSwaggerDocsPath := swaggerAssetPath("import-service")
+	authorizationSwaggerDocsPath := swaggerAssetPath("authorization-service")
 
 	// Namespaced product docs endpoint:
 	// https://<distribution>/docs/product-service/swagger.json
@@ -216,8 +217,19 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		DistributionPaths:    &[]*string{_jsii_.String("/docs/import-service/*")},
 	})
 
+	// Namespaced authorization docs endpoint:
+	// https://<distribution>/docs/authorization-service/swagger.json
+	authorizationSwaggerDeployment := awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-authorization-service-deployment"), &awss3deployment.BucketDeploymentProps{
+		Sources:              swaggerDeploymentSources(authorizationSwaggerDocsPath, "authorization-service"),
+		DestinationBucket:    websiteBucket,
+		DestinationKeyPrefix: _jsii_.String("docs/authorization-service/"),
+		Distribution:         distribution,
+		DistributionPaths:    &[]*string{_jsii_.String("/docs/authorization-service/*")},
+	})
+
 	productSwaggerDeployment.Node().AddDependency(mainUIDeployment)
 	importSwaggerDeployment.Node().AddDependency(mainUIDeployment)
+	authorizationSwaggerDeployment.Node().AddDependency(mainUIDeployment)
 
 	importsBucket := awss3.NewBucket(stack, _jsii_.String("imports-bucket"), &awss3.BucketProps{
 		AutoDeleteObjects: _jsii_.Bool(true),
@@ -415,6 +427,15 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
+	basicAuthorizerFn := awslambda.Function_FromFunctionArn(stack, _jsii_.String("basic-authorizer-import"), basicAuthorizerArn)
+
+	basicAuthorizer := awsapigateway.NewTokenAuthorizer(stack, _jsii_.String("basic-authorizer"), &awsapigateway.TokenAuthorizerProps{
+		AuthorizerName:  _jsii_.String("basic-authorizer"),
+		Handler:         basicAuthorizerFn,
+		IdentitySource:  _jsii_.String("method.request.header.Authorization"),
+		ResultsCacheTtl: awscdk.Duration_Seconds(_jsii_.Number(0)),
+	})
+
 	productsResource := api.Root().AddResource(_jsii_.String("products"), nil)
 	productsResource.AddMethod(
 		_jsii_.String("GET"),
@@ -439,6 +460,8 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(importProductsFileFn, nil),
 		&awsapigateway.MethodOptions{
+			AuthorizationType: awsapigateway.AuthorizationType_CUSTOM,
+			Authorizer:        basicAuthorizer,
 			RequestParameters: &map[string]*bool{
 				"method.request.querystring.name": _jsii_.Bool(true),
 			},
@@ -489,6 +512,22 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		}),
 	})
 
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-authorization-json-url"), &awscdk.CfnOutputProps{
+		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+			_jsii_.String("https://"),
+			distribution.DistributionDomainName(),
+			_jsii_.String("/docs/authorization-service/swagger.json"),
+		}),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-authorization-yaml-url"), &awscdk.CfnOutputProps{
+		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+			_jsii_.String("https://"),
+			distribution.DistributionDomainName(),
+			_jsii_.String("/docs/authorization-service/swagger.yaml"),
+		}),
+	})
+
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-products-list-lambda-name"), &awscdk.CfnOutputProps{
 		Value: listProductsFn.FunctionName(),
 	})
@@ -511,6 +550,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("catalog-batch-process-lambda-name"), &awscdk.CfnOutputProps{
 		Value: catalogBatchProcessFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("basic-authorizer-lambda-name"), &awscdk.CfnOutputProps{
+		Value: basicAuthorizerFn.FunctionName(),
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("imports-bucket-name"), &awscdk.CfnOutputProps{

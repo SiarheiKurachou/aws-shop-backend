@@ -11,6 +11,7 @@ func main() {
 	defer _jsii_.Close()
 
 	app := awscdk.NewApp(nil)
-	stack.NewProductServiceStack(app)
+	_, basicAuthorizerArn := stack.NewAuthorizationServiceStack(app)
+	stack.NewProductServiceStack(app, basicAuthorizerArn)
 	app.Synth(nil)
 }
