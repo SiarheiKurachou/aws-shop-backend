@@ -1,12 +1,12 @@
 package idproduct
 
-import "aws-shop-backend/src/product-service/core"
+import "aws-shop-backend/src/product-service/common"
 
 // Type aliases retained for Swagger annotations and existing tests.
-type Product = core.Product
-type DataFile = core.DataFile
+type Product = common.Product
+type DataFile = common.DataFile
 
-func loadProducts() ([]core.Product, error) { return core.LoadProducts() }
-func findProductByID(products []core.Product, id string) (core.Product, bool) {
-	return core.FindProductByID(products, id)
+func loadProducts() ([]common.Product, error) { return common.LoadProducts() }
+func findProductByID(products []common.Product, id string) (common.Product, bool) {
+	return common.FindProductByID(products, id)
 }

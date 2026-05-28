@@ -1,9 +1,6 @@
 package idproduct
 
-import (
-	corehandlers "aws-shop-backend/src/product-service/core/handlers"
-	"net/http"
-)
+import "net/http"
 
 // HandleGetProductByID handles the GET /products/{id} request
 // @ID get-product-by-id
@@ -19,5 +16,5 @@ import (
 // @Failure 500 {object} map[string]interface{}
 // @Router /products/{id} [get]
 func HandleGetProductByID(w http.ResponseWriter, r *http.Request) {
-	corehandlers.HandleGetProductByID(w, r)
+	handleGetProductByID(w, r)
 }

@@ -1,8 +1,8 @@
-package handlers
+package idproduct
 
 import (
 	"aws-shop-backend/src/httphelpers"
-	"aws-shop-backend/src/product-service/core"
+	"aws-shop-backend/src/product-service/common"
 	"errors"
 	"log"
 	"net/http"
@@ -10,29 +10,28 @@ import (
 
 // getProductByIDService retrieves a single product by ID.
 // Returns an error if the ID is invalid or the product is not found.
-func getProductByIDService(productID string) (core.Product, error) {
+func getProductByIDService(productID string) (common.Product, error) {
 	if productID == "" {
-		return core.Product{}, errors.New("Product id is required")
+		return common.Product{}, errors.New("Product id is required")
 	}
 
-	product, found, err := core.LoadProductByID(productID)
+	product, found, err := common.LoadProductByID(productID)
 	if err != nil {
 		log.Printf("[getProductByIDService] Failed to load product %s: %v", productID, err)
-		return core.Product{}, errors.New("Failed to load products")
+		return common.Product{}, errors.New("Failed to load products")
 	}
 
 	if !found {
-		return core.Product{}, errors.New("Product not found")
+		return common.Product{}, errors.New("Product not found")
 	}
 
 	return product, nil
 }
 
-// HandleGetProductByID is the canonical HTTP handler for GET /products/{id}.
-func HandleGetProductByID(w http.ResponseWriter, r *http.Request) {
+func handleGetProductByID(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[GetProductByID] START - Method=%s, Path=%s, RemoteAddr=%s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	productID := core.ProductIDFromRequest(r)
+	productID := common.ProductIDFromRequest(r)
 	log.Printf("[GetProductByID] EXTRACT - ProductID=%s", productID)
 
 	product, err := getProductByIDService(productID)

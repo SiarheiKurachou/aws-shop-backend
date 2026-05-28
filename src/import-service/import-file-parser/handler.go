@@ -3,16 +3,20 @@ package importfileparser
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
 type s3ObjectAPI interface {
@@ -21,15 +25,22 @@ type s3ObjectAPI interface {
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 }
 
+type sqsSendMessageAPI interface {
+	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
+}
+
 var loadAWSConfig = config.LoadDefaultConfig
 var newS3Client = func(cfg aws.Config) s3ObjectAPI {
 	return s3.NewFromConfig(cfg)
+}
+var newSQSClient = func(cfg aws.Config) sqsSendMessageAPI {
+	return sqs.NewFromConfig(cfg)
 }
 
 // HandleImportFileParser handles S3 event to parse uploaded CSV files.
 //
 // @Summary      Parse uploaded CSV file from S3
-// @Description  Triggered by S3 event, reads CSV, logs records, moves file to parsed, and deletes original.
+// @Description  Triggered by S3 event, reads CSV, sends records to SQS, moves file to parsed, and deletes original.
 // @Tags         import
 // @Accept       json
 // @Produce      json
@@ -47,7 +58,13 @@ func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 		return fmt.Errorf("load aws config: %w", err)
 	}
 
+	queueURL := strings.TrimSpace(os.Getenv("CATALOG_ITEMS_QUEUE_URL"))
+	if queueURL == "" {
+		return fmt.Errorf("CATALOG_ITEMS_QUEUE_URL is not configured")
+	}
+
 	s3Client := newS3Client(cfg)
+	sqsClient := newSQSClient(cfg)
 
 	for _, record := range event.Records {
 		bucketName := record.S3.Bucket.Name
@@ -81,7 +98,20 @@ func HandleImportFileParser(ctx context.Context, event events.S3Event) error {
 		}
 
 		for _, recordMap := range recordMaps {
-			log.Printf("CSV record: %v", recordMap)
+			messageBody, marshalErr := json.Marshal(recordMap)
+			if marshalErr != nil {
+				_ = obj.Body.Close()
+				return fmt.Errorf("marshal csv record for %s/%s: %w", bucketName, decodedKey, marshalErr)
+			}
+
+			_, sendErr := sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+				QueueUrl:    awsString(queueURL),
+				MessageBody: awsString(string(messageBody)),
+			})
+			if sendErr != nil {
+				_ = obj.Body.Close()
+				return fmt.Errorf("send csv record to SQS for %s/%s: %w", bucketName, decodedKey, sendErr)
+			}
 		}
 
 		if closeErr := obj.Body.Close(); closeErr != nil {
@@ -115,7 +145,7 @@ func toParsedKey(key string) string {
 	return "parsed/" + trimmed
 }
 
-func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
+func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]any, error) {
 	csvReader := csv.NewReader(reader)
 	csvReader.FieldsPerRecord = -1
 	headers, readErr := csvReader.Read()
@@ -126,7 +156,12 @@ func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
 		return nil, fmt.Errorf("read headers: %w", readErr)
 	}
 
-	var records []map[string]string
+	var records []map[string]any
+	numericFields := map[string]struct{}{
+		"price": {},
+		"count": {},
+	}
+	rowIndex := 1
 	for {
 		recordValues, readErr := csvReader.Read()
 		if readErr == io.EOF {
@@ -136,13 +171,33 @@ func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
 			return nil, readErr
 		}
 
-		recordMap := map[string]string{}
+		recordMap := map[string]any{}
 		for i, header := range headers {
+			header = strings.TrimSpace(header)
+			_, isNumericField := numericFields[header]
 			if i >= len(recordValues) {
-				recordMap[header] = ""
+				if !isNumericField {
+					recordMap[header] = ""
+				}
 				continue
 			}
-			recordMap[header] = recordValues[i]
+
+			value := strings.TrimSpace(recordValues[i])
+			if isNumericField {
+				if value == "" {
+					continue
+				}
+
+				parsedInt, convErr := strconv.Atoi(value)
+				if convErr != nil {
+					return nil, fmt.Errorf("parse %s in row %d: %w", header, rowIndex, convErr)
+				}
+
+				recordMap[header] = parsedInt
+				continue
+			}
+
+			recordMap[header] = value
 		}
 
 		if len(recordValues) > len(headers) {
@@ -152,6 +207,7 @@ func parseCSVRecordsWithHeaders(reader io.Reader) ([]map[string]string, error) {
 		}
 
 		records = append(records, recordMap)
+		rowIndex++
 	}
 
 	return records, nil

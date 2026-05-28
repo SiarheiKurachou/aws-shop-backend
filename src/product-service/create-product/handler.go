@@ -1,9 +1,6 @@
 package createproduct
 
-import (
-	corehandlers "aws-shop-backend/src/product-service/core/handlers"
-	"net/http"
-)
+import "net/http"
 
 // HandleCreateProduct handles the POST /products request
 // @ID create-product
@@ -18,5 +15,5 @@ import (
 // @Failure 500 {object} map[string]interface{}
 // @Router /products [post]
 func HandleCreateProduct(w http.ResponseWriter, r *http.Request) {
-	corehandlers.HandleCreateProduct(w, r)
+	handleCreateProduct(w, r)
 }

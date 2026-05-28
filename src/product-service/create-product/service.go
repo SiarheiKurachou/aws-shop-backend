@@ -1,23 +1,23 @@
-package handlers
+package createproduct
 
 import (
 	"aws-shop-backend/src/httphelpers"
-	"aws-shop-backend/src/product-service/core"
+	"aws-shop-backend/src/product-service/common"
 	"encoding/json"
 	"log"
 	"net/http"
 )
 
 // createProductService creates a new product from the given request.
-func createProductService(req core.CreateProductRequest) (core.CreateProductResponse, error) {
+func createProductService(req common.CreateProductRequest) (common.CreateProductResponse, error) {
 	log.Printf("[createProductService] Creating product - Title=%s, Price=%d, Count=%d", req.Title, req.Price, req.Count)
 
-	product, err := core.CreateProduct(req)
+	product, err := common.CreateProduct(req)
 	if err != nil {
-		return core.CreateProductResponse{}, err
+		return common.CreateProductResponse{}, err
 	}
 
-	return core.CreateProductResponse{
+	return common.CreateProductResponse{
 		ID:          product.ID,
 		Title:       product.Title,
 		Description: product.Description,
@@ -26,8 +26,7 @@ func createProductService(req core.CreateProductRequest) (core.CreateProductResp
 	}, nil
 }
 
-// HandleCreateProduct is the canonical HTTP handler for POST /products.
-func HandleCreateProduct(w http.ResponseWriter, r *http.Request) {
+func handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[CreateProduct] START - Method=%s, Path=%s, RemoteAddr=%s", r.Method, r.URL.Path, r.RemoteAddr)
 
 	if r.Method != http.MethodPost {
@@ -36,7 +35,7 @@ func HandleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req core.CreateProductRequest
+	var req common.CreateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("[CreateProduct] PARSE_ERROR - %v", err)
 		httphelpers.WriteError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())

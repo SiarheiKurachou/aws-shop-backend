@@ -8,19 +8,19 @@ import (
 	"strings"
 	"testing"
 
-	"aws-shop-backend/src/product-service/core"
+	"aws-shop-backend/src/product-service/common"
 )
 
 func TestValidateCreateProductRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		req     core.CreateProductRequest
+		req     common.CreateProductRequest
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "valid request",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "Test Product",
 				Description: "Test Description",
 				Price:       100,
@@ -30,7 +30,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 		},
 		{
 			name: "missing title",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "",
 				Description: "Test",
 				Price:       100,
@@ -40,7 +40,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 		},
 		{
 			name: "whitespace-only title",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "   ",
 				Description: "Test",
 				Price:       100,
@@ -50,7 +50,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 		},
 		{
 			name: "negative price",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "Product",
 				Description: "Test",
 				Price:       -10,
@@ -60,7 +60,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 		},
 		{
 			name: "negative count",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "Product",
 				Description: "Test",
 				Price:       100,
@@ -71,7 +71,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 		},
 		{
 			name: "zero price is valid",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "Product",
 				Description: "Test",
 				Price:       0,
@@ -80,7 +80,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 		},
 		{
 			name: "zero count is valid",
-			req: core.CreateProductRequest{
+			req: common.CreateProductRequest{
 				Title:       "Product",
 				Description: "Test",
 				Price:       100,
@@ -92,7 +92,7 @@ func TestValidateCreateProductRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := core.ValidateCreateProductRequest(tt.req)
+			err := common.ValidateCreateProductRequest(tt.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateCreateProductRequest() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -119,7 +119,7 @@ func TestHandleCreateProductBadRequest(t *testing.T) {
 		},
 		{
 			name: "missing title",
-			body: core.CreateProductRequest{
+			body: common.CreateProductRequest{
 				Title: "",
 				Price: 100,
 			},
@@ -128,7 +128,7 @@ func TestHandleCreateProductBadRequest(t *testing.T) {
 		},
 		{
 			name: "negative price",
-			body: core.CreateProductRequest{
+			body: common.CreateProductRequest{
 				Title: "Product",
 				Price: -10,
 			},
@@ -175,7 +175,7 @@ func TestHandleCreateProductMethodCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
-			body := core.CreateProductRequest{
+			body := common.CreateProductRequest{
 				Title: "Test",
 				Price: 100,
 			}

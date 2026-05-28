@@ -10,12 +10,13 @@ test:
 	go test ./...
 
 build-lambdas:
-	mkdir -p dist/get-products-list dist/get-product-by-id dist/create-product dist/import-products-file dist/import-file-parser
+	mkdir -p dist/get-products-list dist/get-product-by-id dist/create-product dist/import-products-file dist/import-file-parser dist/catalog-batch-process
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/get-products-list/bootstrap ./cmd/cdk/lambda/get-products-list
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/get-product-by-id/bootstrap ./cmd/cdk/lambda/get-product-by-id
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -tags lambda_create_product -o dist/create-product/bootstrap ./cmd/cdk/lambda/create-product
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/import-products-file/bootstrap ./cmd/cdk/lambda/import-products-file
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/import-file-parser/bootstrap ./cmd/cdk/lambda/import-file-parser
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/catalog-batch-process/bootstrap ./cmd/cdk/lambda/catalog-batch-process
 
 build-swagger:
 	@command -v swag >/dev/null 2>&1 || (echo "swag CLI not found; install with: go install github.com/swaggo/swag/cmd/swag@latest" && exit 1)

@@ -1,9 +1,6 @@
 package listproducts
 
-import (
-	corehandlers "aws-shop-backend/src/product-service/core/handlers"
-	"net/http"
-)
+import "net/http"
 
 // HandleListProducts handles the GET /products request
 // @ID get-products-list
@@ -16,5 +13,5 @@ import (
 // @Failure 500 {object} map[string]interface{}
 // @Router /products [get]
 func HandleListProducts(w http.ResponseWriter, r *http.Request) {
-	corehandlers.HandleListProducts(w, r)
+	handleListProducts(w, r)
 }

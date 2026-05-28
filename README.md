@@ -17,7 +17,7 @@ The import service has two handlers:
 - `import-products-file`: API Gateway `GET /import?name=<file.csv>` returns a signed S3 PUT URL for `uploaded/<file.csv>`.
 - `import-file-parser`: S3 event consumer triggered by `s3:ObjectCreated:*` for objects with key prefix `uploaded/`.
 
-When a CSV is uploaded to the signed URL, the parser lambda reads the object as a stream, treats the first row as headers, maps each next row to a key-value record, and logs each record to CloudWatch.
+When a CSV is uploaded to the signed URL, the parser lambda reads the object as a stream, treats the first row as headers, maps each next row to a key-value record, and sends each record to `catalogItemsQueue` in SQS.
 
 ### Run Locally
 Run the local import-service HTTP server:
@@ -57,6 +57,10 @@ export AWS_REGION=eu-north-1
 export AWS_ACCOUNT_ID=<your-aws-account-id>
 export CDK_DEFAULT_REGION="$AWS_REGION"
 export CDK_DEFAULT_ACCOUNT="$AWS_ACCOUNT_ID"
+
+# Required for SNS email subscription on createProductTopic.
+export PRODUCT_NOTIFICATION_EMAIL=<your-email@example.com>
+export PRODUCT_NOTIFICATION_EMAIL_PREMIUM=<your-second-email@example.com>
 
 # Optional: override the default website bucket name.
 export S3_BUCKET_NAME=<your-unique-bucket-name>
@@ -140,10 +144,18 @@ Use this checklist after `make cdk-deploy`:
 	  `curl -X PUT --upload-file ./test-products.csv "<signed-url-from-step-2>"`
 4. Verify object location in S3:
 	- Check that `test-products.csv` exists under the `uploaded/` prefix in the imports bucket.
-5. Verify parser Lambda trigger and logs in CloudWatch:
+5. Verify parser Lambda trigger and SQS delivery:
 	- Open logs for `import-file-parser`.
 	- Confirm invocation happened after upload.
-	- Confirm log lines like `CSV record: map[...]` are present for parsed rows.
+	- Confirm messages are published to `catalogItemsQueue`.
 6. Negative check (prefix filter):
 	- Upload a CSV outside `uploaded/` (for example to `other/test.csv`).
 	- Confirm `import-file-parser` is not triggered for that upload.
+
+## SNS Notifications
+The stack creates an SNS topic named `createProductTopic` and subscribes an email endpoint to it.
+
+- Set `PRODUCT_NOTIFICATION_EMAIL` for the `budget` filter subscription.
+- Set `PRODUCT_NOTIFICATION_EMAIL_PREMIUM` for the `premium` filter subscription.
+- The `catalogBatchProcess` lambda publishes a `priceCategory` message attribute (`budget` or `premium`) so SNS filter policies route to different emails.
+- After deployment, confirm both SNS subscription confirmation emails in your inbox.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	awscdk "github.com/aws/aws-cdk-go/awscdk/v2"
@@ -12,9 +13,13 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfrontorigins"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awslambdaeventsources"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3deployment"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3notifications"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awssns"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awssnssubscriptions"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awssqs"
 	"github.com/aws/constructs-go/constructs/v10"
 	_jsii_ "github.com/aws/jsii-runtime-go"
 )
@@ -310,12 +315,71 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
+	catalogItemsQueue := awssqs.NewQueue(stack, _jsii_.String("catalog-items-queue"), &awssqs.QueueProps{
+		QueueName: _jsii_.String("catalogItemsQueue"),
+	})
+
+	createProductTopic := awssns.NewTopic(stack, _jsii_.String("create-product-topic"), &awssns.TopicProps{
+		TopicName: _jsii_.String("createProductTopic"),
+	})
+
+	budgetNotificationEmail := strings.TrimSpace(os.Getenv("PRODUCT_NOTIFICATION_EMAIL"))
+	if budgetNotificationEmail == "" {
+		budgetNotificationEmail = "your-email@example.com"
+	}
+
+	premiumNotificationEmail := strings.TrimSpace(os.Getenv("PRODUCT_NOTIFICATION_EMAIL_PREMIUM"))
+	if premiumNotificationEmail == "" {
+		premiumNotificationEmail = "your-second-email@example.com"
+	}
+
+	createProductTopic.AddSubscription(awssnssubscriptions.NewEmailSubscription(_jsii_.String(budgetNotificationEmail), &awssnssubscriptions.EmailSubscriptionProps{
+		FilterPolicy: &map[string]awssns.SubscriptionFilter{
+			"priceCategory": awssns.SubscriptionFilter_StringFilter(&awssns.StringConditions{
+				Allowlist: &[]*string{_jsii_.String("budget")},
+			}),
+		},
+	}))
+
+	createProductTopic.AddSubscription(awssnssubscriptions.NewEmailSubscription(_jsii_.String(premiumNotificationEmail), &awssnssubscriptions.EmailSubscriptionProps{
+		FilterPolicy: &map[string]awssns.SubscriptionFilter{
+			"priceCategory": awssns.SubscriptionFilter_StringFilter(&awssns.StringConditions{
+				Allowlist: &[]*string{_jsii_.String("premium")},
+			}),
+		},
+	}))
+
+	catalogBatchProcessFn := awslambda.NewFunction(stack, _jsii_.String("catalog-batch-process-lambda"), &awslambda.FunctionProps{
+		FunctionName: _jsii_.String("catalogBatchProcess"),
+		Runtime:      awslambda.Runtime_PROVIDED_AL2023(),
+		Handler:      _jsii_.String("bootstrap"),
+		Code:         awslambda.Code_FromAsset(lambdaAssetPath("catalog-batch-process"), nil),
+		MemorySize:   _jsii_.Number(512),
+		Timeout:      awscdk.Duration_Seconds(_jsii_.Number(10)),
+		Environment: &map[string]*string{
+			"PRODUCTS_TABLE_NAME":      productsTable.TableName(),
+			"STOCKS_TABLE_NAME":        stocksTable.TableName(),
+			"CREATE_PRODUCT_TOPIC_ARN": createProductTopic.TopicArn(),
+		},
+	})
+
+	importFileParserFn.AddEnvironment(_jsii_.String("CATALOG_ITEMS_QUEUE_URL"), catalogItemsQueue.QueueUrl(), nil)
+
+	catalogBatchProcessFn.AddEventSource(awslambdaeventsources.NewSqsEventSource(catalogItemsQueue, &awslambdaeventsources.SqsEventSourceProps{
+		BatchSize: _jsii_.Number(5),
+	}))
+
 	productsTable.GrantReadData(listProductsFn)
 	stocksTable.GrantReadData(listProductsFn)
 	productsTable.GrantReadData(getProductByIDFn)
 	stocksTable.GrantReadData(getProductByIDFn)
 	productsTable.GrantWriteData(createProductFn)
 	stocksTable.GrantWriteData(createProductFn)
+	productsTable.GrantWriteData(catalogBatchProcessFn)
+	stocksTable.GrantWriteData(catalogBatchProcessFn)
+	catalogItemsQueue.GrantConsumeMessages(catalogBatchProcessFn)
+	catalogItemsQueue.GrantSendMessages(importFileParserFn)
+	createProductTopic.GrantPublish(catalogBatchProcessFn)
 	importsBucket.GrantPut(importProductsFileFn, _jsii_.String("uploaded/*"))
 	importsBucket.GrantRead(importFileParserFn, _jsii_.String("uploaded/*"))
 	importsBucket.GrantDelete(importFileParserFn, _jsii_.String("uploaded/*"))
@@ -445,6 +509,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		Value: importFileParserFn.FunctionName(),
 	})
 
+	awscdk.NewCfnOutput(stack, _jsii_.String("catalog-batch-process-lambda-name"), &awscdk.CfnOutputProps{
+		Value: catalogBatchProcessFn.FunctionName(),
+	})
+
 	awscdk.NewCfnOutput(stack, _jsii_.String("imports-bucket-name"), &awscdk.CfnOutputProps{
 		Value: importsBucket.BucketName(),
 	})
@@ -455,6 +523,14 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("stocks-table-name"), &awscdk.CfnOutputProps{
 		Value: stocksTable.TableName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("catalog-items-queue-name"), &awscdk.CfnOutputProps{
+		Value: catalogItemsQueue.QueueName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("create-product-topic-arn"), &awscdk.CfnOutputProps{
+		Value: createProductTopic.TopicArn(),
 	})
 
 	return stack

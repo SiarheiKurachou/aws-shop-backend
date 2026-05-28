@@ -6,10 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 
-	"aws-shop-backend/src/product-service/core"
-	corehandlers "aws-shop-backend/src/product-service/core/handlers"
+	"aws-shop-backend/src/product-service/common"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -17,7 +15,7 @@ import (
 
 func handler(_ context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	// Parse request body
-	var req core.CreateProductRequest
+	var req common.CreateProductRequest
 	if err := json.Unmarshal([]byte(event.Body), &req); err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusBadRequest,
@@ -29,20 +27,7 @@ func handler(_ context.Context, event events.APIGatewayProxyRequest) (events.API
 		}, nil
 	}
 
-	// Create httptest request/recorder to use the handler
-	httpReq := httptest.NewRequest(http.MethodPost, "/products", nil)
-	rr := httptest.NewRecorder()
-
-	// Call the handler through the request context (inject body)
-	httpReq.Body = httptest.NewRequest(http.MethodPost, "/products", nil).Body
-	rr = httptest.NewRecorder()
-
-	// Manually call HandleCreateProduct
-	corehandlers.HandleCreateProduct(rr, httpReq)
-
-	// Actually, we need to pass the parsed request to create the product
-	// Let's create it directly
-	product, err := core.CreateProduct(req)
+	product, err := common.CreateProduct(req)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
 		errMsg := err.Error()
@@ -65,7 +50,7 @@ func handler(_ context.Context, event events.APIGatewayProxyRequest) (events.API
 	}
 
 	// Return created product
-	body, _ := json.Marshal(core.CreateProductResponse{
+	body, _ := json.Marshal(common.CreateProductResponse{
 		ID:          product.ID,
 		Title:       product.Title,
 		Description: product.Description,
