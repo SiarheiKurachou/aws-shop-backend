@@ -79,18 +79,22 @@ Build Swagger docs before synth or deploy if API annotations changed:
 # Install swag CLI (one-time setup)
 go install github.com/swaggo/swag/cmd/swag@latest
 
-# Regenerate docs.go, swagger.json, and swagger.yaml in dist/product-service/docs
+# Regenerate docs.go, swagger.json, and swagger.yaml in dist/docs/*
 make build-swagger
 
 # If "swag" is not in PATH, run it directly:
 # PATH="$(go env GOPATH)/bin:$PATH" make build-swagger
 ```
 
-Swagger static files are deployed from `dist/product-service/docs/` to the website bucket under `docs/`.
+Swagger static files are deployed from `dist/docs/` to the website bucket under `docs/`.
 After deployment, use the CloudFront domain output to access:
 
-- `https://<cloudfront-domain>/docs/swagger.json`
-- `https://<cloudfront-domain>/docs/swagger.yaml`
+- `https://<cloudfront-domain>/docs/product-service/swagger.json`
+- `https://<cloudfront-domain>/docs/product-service/swagger.yaml`
+- `https://<cloudfront-domain>/docs/import-service/swagger.json`
+- `https://<cloudfront-domain>/docs/import-service/swagger.yaml`
+- `https://<cloudfront-domain>/docs/authorization-service/swagger.json`
+- `https://<cloudfront-domain>/docs/authorization-service/swagger.yaml`
 
 Synthesize the combined stack:
 
