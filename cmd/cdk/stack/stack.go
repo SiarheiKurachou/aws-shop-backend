@@ -492,13 +492,6 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 		SameEnvironment: _jsii_.Bool(true),
 	})
 
-	basicAuthorizer := awsapigateway.NewTokenAuthorizer(stack, _jsii_.String("basic-authorizer"), &awsapigateway.TokenAuthorizerProps{
-		AuthorizerName:  _jsii_.String("basic-authorizer"),
-		Handler:         basicAuthorizerFn,
-		IdentitySource:  _jsii_.String("method.request.header.Authorization"),
-		ResultsCacheTtl: awscdk.Duration_Seconds(_jsii_.Number(0)),
-	})
-
 	productsResource := api.Root().AddResource(_jsii_.String("products"), nil)
 	productsResource.AddMethod(
 		_jsii_.String("GET"),
@@ -526,8 +519,8 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(importProductsFileFn, nil),
 		&awsapigateway.MethodOptions{
-			AuthorizationType: awsapigateway.AuthorizationType_CUSTOM,
-			Authorizer:        basicAuthorizer,
+			AuthorizationType: awsapigateway.AuthorizationType_COGNITO,
+			Authorizer:        cognitoAuthorizer,
 			RequestParameters: &map[string]*bool{
 				"method.request.querystring.name": _jsii_.Bool(true),
 			},
