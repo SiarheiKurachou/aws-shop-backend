@@ -107,6 +107,38 @@ func existingCognitoUserPoolClientID() string {
 	return strings.TrimSpace(os.Getenv("EXISTING_COGNITO_USER_POOL_CLIENT_ID"))
 }
 
+func normalizedExistingCognitoUserPoolID() string {
+	poolIDOrArn := existingCognitoUserPoolID()
+	if poolIDOrArn == "" {
+		panic("EXISTING_COGNITO_USER_POOL_ID is required and must be a user pool ID (e.g. us-east-1_abc123) or full user pool ARN")
+	}
+
+	if strings.HasPrefix(poolIDOrArn, "arn:") {
+		const userPoolArnMarker = ":userpool/"
+		markerIdx := strings.Index(poolIDOrArn, userPoolArnMarker)
+		if markerIdx == -1 {
+			panic("EXISTING_COGNITO_USER_POOL_ID is an ARN but not a Cognito user pool ARN")
+		}
+
+		poolIDOrArn = poolIDOrArn[markerIdx+len(userPoolArnMarker):]
+	}
+
+	if !strings.Contains(poolIDOrArn, "_") {
+		panic("EXISTING_COGNITO_USER_POOL_ID must look like a user pool ID (example: us-east-1_abc123)")
+	}
+
+	return poolIDOrArn
+}
+
+func requiredExistingCognitoUserPoolClientID() string {
+	clientID := existingCognitoUserPoolClientID()
+	if clientID == "" {
+		panic("EXISTING_COGNITO_USER_POOL_CLIENT_ID is required when importing an existing Cognito user pool")
+	}
+
+	return clientID
+}
+
 func deploymentEnv() *awscdk.Environment {
 	account := os.Getenv("AWS_ACCOUNT_ID")
 	if account == "" {
@@ -436,16 +468,8 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 		},
 	})
 
-	existingUserPoolID := existingCognitoUserPoolID()
-	existingUserPoolClientID := existingCognitoUserPoolClientID()
-
-	if existingUserPoolID == "" && existingUserPoolClientID != "" {
-		panic("EXISTING_COGNITO_USER_POOL_CLIENT_ID requires EXISTING_COGNITO_USER_POOL_ID")
-	}
-
-	if existingUserPoolID != "" && existingUserPoolClientID == "" {
-		panic("EXISTING_COGNITO_USER_POOL_ID requires EXISTING_COGNITO_USER_POOL_CLIENT_ID")
-	}
+	existingUserPoolID := normalizedExistingCognitoUserPoolID()
+	existingUserPoolClientID := requiredExistingCognitoUserPoolClientID()
 
 	var productUserPool awscognito.IUserPool
 	var productUserPoolID *string
@@ -463,7 +487,10 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 		IdentitySource: _jsii_.String("method.request.header.Authorization"),
 	})
 
-	basicAuthorizerFn := awslambda.Function_FromFunctionArn(stack, _jsii_.String("basic-authorizer-import"), basicAuthorizerArn)
+	basicAuthorizerFn := awslambda.Function_FromFunctionAttributes(stack, _jsii_.String("basic-authorizer-import"), &awslambda.FunctionAttributes{
+		FunctionArn:     basicAuthorizerArn,
+		SameEnvironment: _jsii_.Bool(true),
+	})
 
 	basicAuthorizer := awsapigateway.NewTokenAuthorizer(stack, _jsii_.String("basic-authorizer"), &awsapigateway.TokenAuthorizerProps{
 		AuthorizerName:  _jsii_.String("basic-authorizer"),
