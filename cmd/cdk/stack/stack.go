@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfront"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfrontorigins"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awscognito"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambdaeventsources"
@@ -96,6 +97,14 @@ func websiteBucketName() *string {
 	}
 
 	return _jsii_.String(bucketName)
+}
+
+func existingCognitoUserPoolID() string {
+	return strings.TrimSpace(os.Getenv("EXISTING_COGNITO_USER_POOL_ID"))
+}
+
+func existingCognitoUserPoolClientID() string {
+	return strings.TrimSpace(os.Getenv("EXISTING_COGNITO_USER_POOL_CLIENT_ID"))
 }
 
 func deploymentEnv() *awscdk.Environment {
@@ -427,6 +436,65 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 		},
 	})
 
+	existingUserPoolID := existingCognitoUserPoolID()
+	existingUserPoolClientID := existingCognitoUserPoolClientID()
+
+	if existingUserPoolID == "" && existingUserPoolClientID != "" {
+		panic("EXISTING_COGNITO_USER_POOL_CLIENT_ID requires EXISTING_COGNITO_USER_POOL_ID")
+	}
+
+	if existingUserPoolID != "" && existingUserPoolClientID == "" {
+		panic("EXISTING_COGNITO_USER_POOL_ID requires EXISTING_COGNITO_USER_POOL_CLIENT_ID")
+	}
+
+	var productUserPool awscognito.IUserPool
+	var productUserPoolID *string
+	var productUserPoolClientID *string
+
+	if existingUserPoolID != "" {
+		productUserPool = awscognito.UserPool_FromUserPoolId(stack, _jsii_.String("products-user-pool-import"), _jsii_.String(existingUserPoolID))
+		productUserPoolID = _jsii_.String(existingUserPoolID)
+		productUserPoolClientID = _jsii_.String(existingUserPoolClientID)
+	} else {
+		createdProductUserPool := awscognito.NewUserPool(stack, _jsii_.String("products-user-pool"), &awscognito.UserPoolProps{
+			UserPoolName:      _jsii_.String("products-user-pool"),
+			SelfSignUpEnabled: _jsii_.Bool(false),
+			SignInAliases: &awscognito.SignInAliases{
+				Email: _jsii_.Bool(true),
+			},
+			StandardAttributes: &awscognito.StandardAttributes{
+				Email: &awscognito.StandardAttribute{
+					Required: _jsii_.Bool(true),
+					Mutable:  _jsii_.Bool(true),
+				},
+			},
+			PasswordPolicy: &awscognito.PasswordPolicy{
+				MinLength: _jsii_.Number(8),
+			},
+			RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
+		})
+
+		createdProductUserPoolClient := createdProductUserPool.AddClient(_jsii_.String("products-user-pool-client"), &awscognito.UserPoolClientOptions{
+			UserPoolClientName: _jsii_.String("products-user-pool-client"),
+			AuthFlows: &awscognito.AuthFlow{
+				UserPassword: _jsii_.Bool(true),
+				UserSrp:      _jsii_.Bool(true),
+			},
+		})
+
+		productUserPool = createdProductUserPool
+		productUserPoolID = createdProductUserPool.UserPoolId()
+		productUserPoolClientID = createdProductUserPoolClient.UserPoolClientId()
+	}
+
+	cognitoAuthorizer := awsapigateway.NewCognitoUserPoolsAuthorizer(stack, _jsii_.String("products-cognito-authorizer"), &awsapigateway.CognitoUserPoolsAuthorizerProps{
+		AuthorizerName: _jsii_.String("products-cognito-authorizer"),
+		CognitoUserPools: &[]awscognito.IUserPool{
+			productUserPool,
+		},
+		IdentitySource: _jsii_.String("method.request.header.Authorization"),
+	})
+
 	basicAuthorizerFn := awslambda.Function_FromFunctionArn(stack, _jsii_.String("basic-authorizer-import"), basicAuthorizerArn)
 
 	basicAuthorizer := awsapigateway.NewTokenAuthorizer(stack, _jsii_.String("basic-authorizer"), &awsapigateway.TokenAuthorizerProps{
@@ -440,7 +508,10 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 	productsResource.AddMethod(
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(listProductsFn, nil),
-		nil,
+		&awsapigateway.MethodOptions{
+			AuthorizationType: awsapigateway.AuthorizationType_COGNITO,
+			Authorizer:        cognitoAuthorizer,
+		},
 	)
 	productsResource.AddMethod(
 		_jsii_.String("POST"),
@@ -530,6 +601,14 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-products-list-lambda-name"), &awscdk.CfnOutputProps{
 		Value: listProductsFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("products-user-pool-id"), &awscdk.CfnOutputProps{
+		Value: productUserPoolID,
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("products-user-pool-client-id"), &awscdk.CfnOutputProps{
+		Value: productUserPoolClientID,
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-product-by-id-lambda-name"), &awscdk.CfnOutputProps{
