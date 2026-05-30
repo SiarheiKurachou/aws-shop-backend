@@ -451,41 +451,9 @@ func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *stri
 	var productUserPoolID *string
 	var productUserPoolClientID *string
 
-	if existingUserPoolID != "" {
-		productUserPool = awscognito.UserPool_FromUserPoolId(stack, _jsii_.String("products-user-pool-import"), _jsii_.String(existingUserPoolID))
-		productUserPoolID = _jsii_.String(existingUserPoolID)
-		productUserPoolClientID = _jsii_.String(existingUserPoolClientID)
-	} else {
-		createdProductUserPool := awscognito.NewUserPool(stack, _jsii_.String("products-user-pool"), &awscognito.UserPoolProps{
-			UserPoolName:      _jsii_.String("products-user-pool"),
-			SelfSignUpEnabled: _jsii_.Bool(false),
-			SignInAliases: &awscognito.SignInAliases{
-				Email: _jsii_.Bool(true),
-			},
-			StandardAttributes: &awscognito.StandardAttributes{
-				Email: &awscognito.StandardAttribute{
-					Required: _jsii_.Bool(true),
-					Mutable:  _jsii_.Bool(true),
-				},
-			},
-			PasswordPolicy: &awscognito.PasswordPolicy{
-				MinLength: _jsii_.Number(8),
-			},
-			RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
-		})
-
-		createdProductUserPoolClient := createdProductUserPool.AddClient(_jsii_.String("products-user-pool-client"), &awscognito.UserPoolClientOptions{
-			UserPoolClientName: _jsii_.String("products-user-pool-client"),
-			AuthFlows: &awscognito.AuthFlow{
-				UserPassword: _jsii_.Bool(true),
-				UserSrp:      _jsii_.Bool(true),
-			},
-		})
-
-		productUserPool = createdProductUserPool
-		productUserPoolID = createdProductUserPool.UserPoolId()
-		productUserPoolClientID = createdProductUserPoolClient.UserPoolClientId()
-	}
+	productUserPool = awscognito.UserPool_FromUserPoolId(stack, _jsii_.String("products-user-pool-import"), _jsii_.String(existingUserPoolID))
+	productUserPoolID = _jsii_.String(existingUserPoolID)
+	productUserPoolClientID = _jsii_.String(existingUserPoolClientID)
 
 	cognitoAuthorizer := awsapigateway.NewCognitoUserPoolsAuthorizer(stack, _jsii_.String("products-cognito-authorizer"), &awsapigateway.CognitoUserPoolsAuthorizerProps{
 		AuthorizerName: _jsii_.String("products-cognito-authorizer"),
