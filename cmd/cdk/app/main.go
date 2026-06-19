@@ -13,5 +13,6 @@ func main() {
 	app := awscdk.NewApp(nil)
 	_, basicAuthorizerArn := stack.NewAuthorizationServiceStack(app)
 	stack.NewProductServiceStack(app, basicAuthorizerArn)
+	stack.NewBFFServiceStack(app)
 	app.Synth(nil)
 }

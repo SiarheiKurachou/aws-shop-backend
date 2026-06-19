@@ -132,6 +132,90 @@ What gets deployed:
 
 The stack outputs include the API URL, website bucket name, CloudFront domain name, and Lambda function names.
 
+## BFF Service Deployment (Elastic Beanstalk)
+The BFF service is deployed with a dedicated CDK stack: `bff-service-stack`.
+
+Deployment conventions implemented by the stack:
+
+- Elastic Beanstalk application name: `<github_login>-bff-api`
+- Elastic Beanstalk CNAME prefix: `<github_login>-bff-api-<environment_name>`
+- Environment type: single instance (`--single` equivalent)
+
+### Prerequisites
+- AWS credentials are configured for the target account.
+- Node.js is available so `npx aws-cdk` can run.
+- Go toolchain is installed to build the BFF binary.
+
+### Required Environment Variables
+Export these variables before synth/deploy:
+
+```bash
+export AWS_REGION=eu-north-1
+export AWS_ACCOUNT_ID=<your-aws-account-id>
+export CDK_DEFAULT_REGION="$AWS_REGION"
+export CDK_DEFAULT_ACCOUNT="$AWS_ACCOUNT_ID"
+
+# Required for BFF naming convention
+export GITHUB_ACCOUNT_LOGIN=<your_github_login>
+
+# Used in CNAME prefix: <github_login>-bff-api-<environment_name>
+export BFF_ENVIRONMENT_NAME=dev
+
+# BFF recipient targets (only these two are supported)
+export PRODUCT_URL=https://<product-service-host>
+export CART_URL=https://<cart-service-host>
+```
+
+Optional tuning variables:
+
+```bash
+export BFF_EB_INSTANCE_TYPE=t3.micro
+export BFF_EB_SOLUTION_STACK_NAME="64bit Amazon Linux 2 v5.8.4 running Go 1"
+```
+
+### Build and Deploy
+Build Elastic Beanstalk source bundle for BFF:
+
+```bash
+make build-bff-eb
+```
+
+Synthesize only the BFF stack:
+
+```bash
+make cdk-synth-bff
+```
+
+Deploy only the BFF stack:
+
+```bash
+make cdk-deploy-bff
+```
+
+### Verify Deployment
+1. Confirm CDK outputs include `bff-service-application-name` (must be `<github_login>-bff-api`) and `bff-service-cname-prefix` (must be `<github_login>-bff-api-<environment_name>`).
+2. Call BFF with allowed recipients:
+
+```bash
+# Product service call through BFF
+curl "http://<bff-host>/product/products"
+
+# Cart service call through BFF
+curl "http://<bff-host>/cart"
+```
+
+3. Confirm unsupported recipient is blocked with 502:
+
+```bash
+curl -i "http://<bff-host>/orders"
+# Expected: HTTP/1.1 502 with body containing "Cannot process request"
+```
+
+### Notes
+- BFF supports only `product` and `cart` recipient names.
+- BFF forwards method, headers, query string, and body to recipient services.
+- On recipient service error, BFF returns the same status code and error body.
+
 ## Import Service Deployment Verification
 Use this checklist after `make cdk-deploy`:
 

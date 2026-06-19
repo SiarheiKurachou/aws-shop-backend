@@ -4,7 +4,7 @@ STACK_NAME ?= epam-shop-website-stack
 CDK_APP ?= go run -buildvcs=false ./cmd/cdk/app
 CDK ?= npx aws-cdk
 
-.PHONY: test build-lambdas build-swagger cdk-clean cdk-synth cdk-deploy build-populate-dynamo populate-dynamo populate-dynamo-append
+.PHONY: test build-lambdas build-bff-eb build-swagger cdk-clean cdk-synth cdk-deploy cdk-synth-bff cdk-deploy-bff build-populate-dynamo populate-dynamo populate-dynamo-append
 
 test:
 	go test ./...
@@ -19,6 +19,11 @@ build-lambdas:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/catalog-batch-process/bootstrap ./cmd/cdk/lambda/catalog-batch-process
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/basic-authorizer/bootstrap ./cmd/cdk/lambda/basic-authorizer
 
+build-bff-eb:
+	mkdir -p dist/bff-service-eb
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o dist/bff-service-eb/bff-service ./src/bff-service
+	echo "web: ./bff-service" > dist/bff-service-eb/Procfile
+
 build-swagger:
 	@command -v swag >/dev/null 2>&1 || (echo "swag CLI not found; install with: go install github.com/swaggo/swag/cmd/swag@latest" && exit 1)
 	mkdir -p dist/docs/product-service dist/docs/import-service dist/docs/authorization-service
@@ -29,11 +34,17 @@ build-swagger:
 cdk-clean:
 	rm -rf dist && rm -rf cdk.out
 
-cdk-synth: build-lambdas
+cdk-synth: build-lambdas build-bff-eb
 	$(CDK) synth $(STACK_NAME) --app "$(CDK_APP)"
 
-cdk-deploy: build-lambdas
+cdk-deploy: build-lambdas build-bff-eb
 	$(CDK) deploy $(STACK_NAME) --app "$(CDK_APP)" --require-approval never --outputs-file cdk.out/outputs.json
+
+cdk-synth-bff: build-bff-eb
+	$(CDK) synth bff-service-stack --app "$(CDK_APP)"
+
+cdk-deploy-bff: build-bff-eb
+	$(CDK) deploy bff-service-stack --app "$(CDK_APP)" --require-approval never --outputs-file cdk.out/bff-outputs.json
 
 build-populate-dynamo:
 	mkdir -p dist
