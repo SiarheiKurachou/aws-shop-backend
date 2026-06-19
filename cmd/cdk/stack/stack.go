@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfront"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscloudfrontorigins"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awscognito"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambdaeventsources"
@@ -98,6 +99,46 @@ func websiteBucketName() *string {
 	return _jsii_.String(bucketName)
 }
 
+func existingCognitoUserPoolID() string {
+	return strings.TrimSpace(os.Getenv("EXISTING_COGNITO_USER_POOL_ID"))
+}
+
+func existingCognitoUserPoolClientID() string {
+	return strings.TrimSpace(os.Getenv("EXISTING_COGNITO_USER_POOL_CLIENT_ID"))
+}
+
+func normalizedExistingCognitoUserPoolID() string {
+	poolIDOrArn := existingCognitoUserPoolID()
+	if poolIDOrArn == "" {
+		panic("EXISTING_COGNITO_USER_POOL_ID is required and must be a user pool ID (e.g. us-east-1_abc123) or full user pool ARN")
+	}
+
+	if strings.HasPrefix(poolIDOrArn, "arn:") {
+		const userPoolArnMarker = ":userpool/"
+		markerIdx := strings.Index(poolIDOrArn, userPoolArnMarker)
+		if markerIdx == -1 {
+			panic("EXISTING_COGNITO_USER_POOL_ID is an ARN but not a Cognito user pool ARN")
+		}
+
+		poolIDOrArn = poolIDOrArn[markerIdx+len(userPoolArnMarker):]
+	}
+
+	if !strings.Contains(poolIDOrArn, "_") {
+		panic("EXISTING_COGNITO_USER_POOL_ID must look like a user pool ID (example: us-east-1_abc123)")
+	}
+
+	return poolIDOrArn
+}
+
+func requiredExistingCognitoUserPoolClientID() string {
+	clientID := existingCognitoUserPoolClientID()
+	if clientID == "" {
+		panic("EXISTING_COGNITO_USER_POOL_CLIENT_ID is required when importing an existing Cognito user pool")
+	}
+
+	return clientID
+}
+
 func deploymentEnv() *awscdk.Environment {
 	account := os.Getenv("AWS_ACCOUNT_ID")
 	if account == "" {
@@ -122,13 +163,13 @@ func deploymentEnv() *awscdk.Environment {
 	}
 }
 
-// NewProductServiceStack creates the product service infrastructure in the
+// NewProductServiceStack creates the product and import service infrastructure in the
 // existing EPAM shop website stack.
 //
 // Expected Lambda artifacts:
 // - cdk/dist/get-products-list/bootstrap
 // - cdk/dist/get-product-by-id/bootstrap
-func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
+func NewProductServiceStack(scope constructs.Construct, basicAuthorizerArn *string) awscdk.Stack {
 	stack := awscdk.NewStack(scope, _jsii_.String("epam-shop-website-stack"), &awscdk.StackProps{
 		StackName: _jsii_.String("epam-shop-website-stack"),
 		Env:       deploymentEnv(),
@@ -195,6 +236,7 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	productSwaggerDocsPath := swaggerAssetPath("product-service")
 	importSwaggerDocsPath := swaggerAssetPath("import-service")
+	authorizationSwaggerDocsPath := swaggerAssetPath("authorization-service")
 
 	// Namespaced product docs endpoint:
 	// https://<distribution>/docs/product-service/swagger.json
@@ -216,8 +258,19 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		DistributionPaths:    &[]*string{_jsii_.String("/docs/import-service/*")},
 	})
 
+	// Namespaced authorization docs endpoint:
+	// https://<distribution>/docs/authorization-service/swagger.json
+	authorizationSwaggerDeployment := awss3deployment.NewBucketDeployment(stack, _jsii_.String("swagger-authorization-service-deployment"), &awss3deployment.BucketDeploymentProps{
+		Sources:              swaggerDeploymentSources(authorizationSwaggerDocsPath, "authorization-service"),
+		DestinationBucket:    websiteBucket,
+		DestinationKeyPrefix: _jsii_.String("docs/authorization-service/"),
+		Distribution:         distribution,
+		DistributionPaths:    &[]*string{_jsii_.String("/docs/authorization-service/*")},
+	})
+
 	productSwaggerDeployment.Node().AddDependency(mainUIDeployment)
 	importSwaggerDeployment.Node().AddDependency(mainUIDeployment)
+	authorizationSwaggerDeployment.Node().AddDependency(mainUIDeployment)
 
 	importsBucket := awss3.NewBucket(stack, _jsii_.String("imports-bucket"), &awss3.BucketProps{
 		AutoDeleteObjects: _jsii_.Bool(true),
@@ -415,11 +468,38 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		},
 	})
 
+	existingUserPoolID := normalizedExistingCognitoUserPoolID()
+	existingUserPoolClientID := requiredExistingCognitoUserPoolClientID()
+
+	var productUserPool awscognito.IUserPool
+	var productUserPoolID *string
+	var productUserPoolClientID *string
+
+	productUserPool = awscognito.UserPool_FromUserPoolId(stack, _jsii_.String("products-user-pool-import"), _jsii_.String(existingUserPoolID))
+	productUserPoolID = _jsii_.String(existingUserPoolID)
+	productUserPoolClientID = _jsii_.String(existingUserPoolClientID)
+
+	cognitoAuthorizer := awsapigateway.NewCognitoUserPoolsAuthorizer(stack, _jsii_.String("products-cognito-authorizer"), &awsapigateway.CognitoUserPoolsAuthorizerProps{
+		AuthorizerName: _jsii_.String("products-cognito-authorizer"),
+		CognitoUserPools: &[]awscognito.IUserPool{
+			productUserPool,
+		},
+		IdentitySource: _jsii_.String("method.request.header.Authorization"),
+	})
+
+	basicAuthorizerFn := awslambda.Function_FromFunctionAttributes(stack, _jsii_.String("basic-authorizer-import"), &awslambda.FunctionAttributes{
+		FunctionArn:     basicAuthorizerArn,
+		SameEnvironment: _jsii_.Bool(true),
+	})
+
 	productsResource := api.Root().AddResource(_jsii_.String("products"), nil)
 	productsResource.AddMethod(
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(listProductsFn, nil),
-		nil,
+		&awsapigateway.MethodOptions{
+			AuthorizationType: awsapigateway.AuthorizationType_COGNITO,
+			Authorizer:        cognitoAuthorizer,
+		},
 	)
 	productsResource.AddMethod(
 		_jsii_.String("POST"),
@@ -439,6 +519,8 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		_jsii_.String("GET"),
 		awsapigateway.NewLambdaIntegration(importProductsFileFn, nil),
 		&awsapigateway.MethodOptions{
+			AuthorizationType: awsapigateway.AuthorizationType_COGNITO,
+			Authorizer:        cognitoAuthorizer,
 			RequestParameters: &map[string]*bool{
 				"method.request.querystring.name": _jsii_.Bool(true),
 			},
@@ -489,8 +571,32 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 		}),
 	})
 
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-authorization-json-url"), &awscdk.CfnOutputProps{
+		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+			_jsii_.String("https://"),
+			distribution.DistributionDomainName(),
+			_jsii_.String("/docs/authorization-service/swagger.json"),
+		}),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("swagger-authorization-yaml-url"), &awscdk.CfnOutputProps{
+		Value: awscdk.Fn_Join(_jsii_.String(""), &[]*string{
+			_jsii_.String("https://"),
+			distribution.DistributionDomainName(),
+			_jsii_.String("/docs/authorization-service/swagger.yaml"),
+		}),
+	})
+
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-products-list-lambda-name"), &awscdk.CfnOutputProps{
 		Value: listProductsFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("products-user-pool-id"), &awscdk.CfnOutputProps{
+		Value: productUserPoolID,
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("products-user-pool-client-id"), &awscdk.CfnOutputProps{
+		Value: productUserPoolClientID,
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("get-product-by-id-lambda-name"), &awscdk.CfnOutputProps{
@@ -511,6 +617,10 @@ func NewProductServiceStack(scope constructs.Construct) awscdk.Stack {
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("catalog-batch-process-lambda-name"), &awscdk.CfnOutputProps{
 		Value: catalogBatchProcessFn.FunctionName(),
+	})
+
+	awscdk.NewCfnOutput(stack, _jsii_.String("basic-authorizer-lambda-name"), &awscdk.CfnOutputProps{
+		Value: basicAuthorizerFn.FunctionName(),
 	})
 
 	awscdk.NewCfnOutput(stack, _jsii_.String("imports-bucket-name"), &awscdk.CfnOutputProps{
